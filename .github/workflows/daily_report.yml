@@ -1,0 +1,38 @@
+name: Daily ICT Report
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 매일 한국 시간 오전 9시 (UTC 00:00)
+  workflow_dispatch:      # 수동 실행 버튼 활성화
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드를 가져옵니다
+        uses: actions/checkout@v3
+
+      - name: 파이썬을 설치합니다
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: 라이브러리를 설치합니다
+        run: |
+          pip install -r requirements.txt
+
+      - name: 파이썬 스크립트를 실행합니다
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+        run: python main.py
+
+      - name: 변경된 데이터(prev_data.json)를 저장합니다
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+          git add prev_data.json
+          git commit -m "Update previous data" || echo "No changes to commit"
+          git push
