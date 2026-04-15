@@ -19,6 +19,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.keys import Keys
 
 # =========================================================
 # ⚙️ 설정 (테스트 스위치)
@@ -82,7 +83,7 @@ def get_nipa():
     return items
 
 # ---------------------------------------------------------
-# 2. 기업마당 (href 속성 다이렉트 추출)
+# 2. 기업마당
 # ---------------------------------------------------------
 def get_bizinfo():
     print("\n[기업마당] 1~5페이지 스캔 시작...")
@@ -110,12 +111,11 @@ def get_bizinfo():
                 sinchung = tds[3].text.strip()
                 gongo = normalize_date(tds[6].text.strip())
                 
-                # [수정] 보내주신 HTML대로 href 주소 100% 그대로 활용!
                 href = title_tag.get('href', '')
                 if href and not href.startswith('javascript'):
                     link = "https://www.bizinfo.go.kr" + href if href.startswith('/') else href
                 else:
-                    link = url # 만약의 경우를 위한 검색화면 링크
+                    link = url
 
                 matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
                 items.append({
@@ -129,7 +129,7 @@ def get_bizinfo():
     return items
 
 # ---------------------------------------------------------
-# 3. IRIS 
+# 3. IRIS (타임아웃 완벽 방지)
 # ---------------------------------------------------------
 def get_iris():
     print("\n[IRIS] 스캔 시작...")
@@ -138,8 +138,18 @@ def get_iris():
     try:
         driver = get_chrome_driver()
         driver.get("https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do")
-        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".list_area li, tbody tr")))
-        time.sleep(3) 
+        
+        # [핵심 변경] 리스트가 뜰 때까지 막연히 기다리지 않고, 
+        # 화면에 뜨자마자 검색창(bsnsTl)을 찾아냅니다. (이건 엄청 빨리 뜹니다)
+        search_input = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "bsnsTl")))
+        
+        # 검색창 값을 텅 비우고, 강제로 '엔터키'를 쳐서 
+        # 전체 리스트가 무조건 화면에 새로고침 되도록 만듭니다!
+        driver.execute_script("arguments[0].value = '';", search_input)
+        search_input.send_keys(Keys.ENTER)
+        
+        # 엔터 치고 표가 예쁘게 다 그려질 때까지 4초 대기
+        time.sleep(4) 
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         rows = soup.select('.list_area li, tbody tr')
@@ -168,6 +178,7 @@ def get_iris():
                 "기관": "IRIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
                 "사업명": title, "공고일": gongo, "신청기간": "상세 접속 필요", "링크": link
             })
+            if TEST_MODE: print(f"  👉 [발견] {gongo} | {title[:20]}... | {link}")
     except Exception as e:
         print(f"[IRIS] 에러: {e}")
     finally:
@@ -175,7 +186,7 @@ def get_iris():
     return items
 
 # ---------------------------------------------------------
-# 4. NTIS (href 속성 다이렉트 추출)
+# 4. NTIS
 # ---------------------------------------------------------
 def get_ntis():
     print("\n[NTIS] 스캔 시작...")
@@ -206,7 +217,6 @@ def get_ntis():
                 gongo = "확인필요"
                 sinchung = "확인필요"
             
-            # [수정] 보내주신 HTML대로 href 주소 100% 활용
             href = title_tag.get('href', '')
             if href and not href.startswith('javascript'):
                 link = "https://www.ntis.go.kr" + href if href.startswith('/') else href
@@ -234,7 +244,6 @@ def main():
     all_data.extend(get_ntis()) 
 
     today = datetime.date.today()
-    # 어제, 그제 공고까지 넉넉히 확인
     target_dates = [
         (today).strftime("%Y-%m-%d"),
         (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
@@ -262,7 +271,7 @@ def main():
 
     if TEST_MODE:
         pd.set_option('display.max_rows', None)
-        pd.set_option('display.max_colwidth', None) # 터미널에서 링크가 짤리지 않도록 세팅!
+        pd.set_option('display.max_colwidth', None)
         pd.set_option('display.width', 2000)
         
         print(f"\n{'='*100}")
@@ -272,40 +281,6 @@ def main():
         print(f"{'='*100}")
         print("✅ 성공! 링크 주소들을 복사해서 인터넷 창에 붙여넣어 보세요!")
         return
-
-    # TEST_MODE = False 일 때 이메일 발송 로직
-    html_table = df_daily.copy()
-    html_table['링크'] = html_table['링크'].apply(lambda x: f"<a href='{x}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>" if x != '-' else '-')
-    
-    html_table_str = html_table.to_html(index=False, escape=False)
-    html_table_str = html_table_str.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-family: Arial; font-size: 13px; text-align: left; border: 1px solid #ddd;">')
-    html_table_str = html_table_str.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px; border: 1px solid #ccc; text-align: center; font-weight: bold; color:#1a73e8; white-space: nowrap;">')
-    html_table_str = html_table_str.replace('<td>', '<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle;">')
-
-    for keyword in TARGET_KEYWORDS:
-        html_table_str = html_table_str.replace(f'<td>{keyword}</td>', f'<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle; color: #d93025; font-weight: bold;">{keyword}</td>')
-
-    html_body = f"""
-    <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px;">
-            📋 통합 사업 공고 일일 리포트
-        </h2>
-        {html_table_str}
-    </div>
-    """
-    
-    msg = MIMEMultipart()
-    msg['Subject'] = f"[{today.strftime('%Y-%m-%d')}] 통합 공고 일일 리포트"
-    
-    receiver_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
-    msg['To'] = ", ".join(receiver_list) 
-    msg.attach(MIMEText(html_body, 'html'))
-    
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-        smtp.login(EMAIL_USER, EMAIL_PASS)
-        smtp.sendmail(EMAIL_USER, receiver_list, msg.as_string())
-        
-    print("✅ 이메일 발송 완료!")
 
 if __name__ == "__main__":
     main()
