@@ -18,7 +18,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.keys import Keys # [추가] 엔터키(ENTER) 타건용 모듈
+from selenium.webdriver.common.keys import Keys
 
 # 환경 변수 설정
 EMAIL_USER = os.getenv("EMAIL_USER")
@@ -29,19 +29,17 @@ TARGET_AGENCIES = ["NIPA", "기업마당", "NIA", "IRIS", "KOTRA", "한국전력
 TARGET_KEYWORDS = ['AI', 'AX', 'ICT', '실증', '시범', '테스트베드', '데이터', '스마트공장', '디지털전환', '수출', '스마트시티']
 
 def get_chrome_driver():
-    """보이지 않는 크롬 브라우저 세팅 (안정성 극대화)"""
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-gpu')
     options.add_argument('window-size=1920x1080')
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
     service = Service(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
 
 def fetch_and_filter_board(agency_name, board_url, base_url, css_selector='tbody tr'):
-    """NIPA, 기업마당, NIA 일반 크롤링 (정규식 기반 날짜 추출)"""
+    """일반 크롤링: NIPA, 기업마당, NIA"""
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     items = []
     exclude_keywords = ['결과', '안내', '사전규격', '입찰', '취소', '연기', '설명회', '합격', '명단']
@@ -87,7 +85,7 @@ def fetch_and_filter_board(agency_name, board_url, base_url, css_selector='tbody
                     "링크": f"<a href='{link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>"
                 })
     except Exception as e:
-        print(f"[{agency_name}] 크롤링 에러: {e}")
+        print(f"[{agency_name}] 에러: {e}")
     return items
 
 def get_nipa(): return fetch_and_filter_board("NIPA", "https://www.nipa.kr/home/2-2", "https://www.nipa.kr")
@@ -95,8 +93,8 @@ def get_nia(): return fetch_and_filter_board("NIA", "https://www.nia.or.kr/site/
 def get_bizinfo(): return fetch_and_filter_board("기업마당", "https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do", "https://www.bizinfo.go.kr")
 
 def get_iris():
-    """[핵심] IRIS 초강력 셀레니움 검색 엔진 (직접 찾아주신 ID 반영)"""
-    print("[IRIS] 셀레니움 탐색을 시작합니다...")
+    """IRIS: 키워드 검색 엔진 (엄격한 공고일자 필터 적용)"""
+    print("[IRIS] 셀레니움 검색 엔진 가동...")
     items = []
     driver = None
     search_keywords = ['AI', 'ICT', '데이터', '스마트', '수출'] 
@@ -104,36 +102,33 @@ def get_iris():
     try:
         driver = get_chrome_driver()
         driver.get("https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do")
+        time.sleep(3)
         
         for keyword in search_keywords:
             try:
-                # 1. 제보해주신 정확한 ID("bsnsTl")로 검색창을 한 번에 찾습니다.
-                search_input = WebDriverWait(driver, 15).until(
+                search_input = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.ID, "bsnsTl"))
                 )
-                search_input.clear()
-                
-                # 2. 키워드를 입력하고, 곧바로 엔터(ENTER)키를 쳐서 검색을 실행합니다.
+                # JS로 값 완전 초기화 (글자 누적 방지)
+                driver.execute_script("arguments[0].value = '';", search_input)
                 search_input.send_keys(keyword)
                 search_input.send_keys(Keys.ENTER)
-                
-                # 검색 결과 로딩 대기
-                time.sleep(4) 
+                time.sleep(3) 
                 
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
-                rows = soup.select('tbody tr, .list_area li')
+                
+                # [핵심 필터] 내용 중에 '공고일자'라는 글자가 있는 덩어리만 진짜 공고로 인정!
+                rows = soup.find_all(lambda tag: tag.name in ['li', 'tr'] and '공고일자' in tag.text)
                 
                 for row in rows:
                     text_content = row.text.strip()
-                    if not text_content or "결과가 없습니다" in text_content: continue
                     
-                    title_tag = row.select_one('a, .tit')
-                    if not title_tag: continue
-                    title = title_tag.text.strip()
+                    title_tag = row.select_one('a, .tit, strong')
+                    title = title_tag.text.strip() if title_tag else text_content.split('\n')[0][:50]
                     
                     if "안내" in title or "결과" in title: continue
                         
-                    gongo_match = re.search(r'(202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9])', text_content)
+                    gongo_match = re.search(r'공고일자\s*[:|]?\s*(202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9])', text_content)
                     gongo = gongo_match.group(1).strip() if gongo_match else "상세 확인"
                     
                     if title not in [item['사업명'] for item in items]:
@@ -145,9 +140,8 @@ def get_iris():
                             "신청기간": "상세 링크 확인",
                             "링크": "<a href='https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do' style='color: #0066cc; font-weight: bold;'>[IRIS 바로가기]</a>"
                         })
-            except Exception as inner_e:
-                pass # 에러가 나도 스크립트가 죽지 않고 다음 키워드로 넘어가도록 처리
-                
+            except Exception:
+                pass 
     except Exception as e:
         print(f"[IRIS] 접속 에러: {e}")
     finally:
@@ -155,51 +149,63 @@ def get_iris():
     return items
 
 def get_kotra():
-    """KOTRA 셀레니움 스캔 엔진"""
-    print("[KOTRA] 셀레니움 탐색을 시작합니다...")
+    """KOTRA: ID검색 및 엄격한 신청기간 필터 적용"""
+    print("[KOTRA] 셀레니움 검색 엔진 가동...")
     items = []
     driver = None
+    search_keywords = ['AI', 'ICT', '데이터', '스마트', '수출'] 
+    
     try:
         driver = get_chrome_driver()
         driver.get("https://www.kotra.or.kr/subList/20000020753")
+        time.sleep(3)
         
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "li, tr"))
-        )
-        time.sleep(4) # 추가 렌더링 대기
-        
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        rows = soup.select('li, div.item')
-        
-        for row in rows:
-            text_content = row.text.strip()
-            matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in text_content.upper()]
-            
-            if matched_kws:
-                title_tag = row.select_one('strong, .tit, a')
-                title = title_tag.text.strip() if title_tag else text_content[:40]+"..."
+        for keyword in search_keywords:
+            try:
+                # 제보해주신 schwrdVal ID 사용
+                search_input = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, "schwrdVal"))
+                )
+                driver.execute_script("arguments[0].value = '';", search_input)
+                search_input.send_keys(keyword)
+                search_input.send_keys(Keys.ENTER)
+                time.sleep(3)
                 
-                if len(title) < 5 or "메뉴" in title: continue
+                soup = BeautifulSoup(driver.page_source, 'html.parser')
                 
-                period_match = re.search(r'([0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2}.*?(?:~|-).*?[0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2})', text_content)
-                sinchung = period_match.group(1).strip() if period_match else "상세 확인"
+                # [핵심 필터] 내용 중에 '신청기간'이라는 글자가 포함된 블록만 진짜 공고!
+                rows = soup.find_all(lambda tag: tag.name in ['li', 'div'] and '신청기간' in tag.text)
                 
-                items.append({
-                    "기관": "KOTRA",
-                    "매칭 키워드": ", ".join(matched_kws),
-                    "사업명": title,
-                    "공고일": "목록 참조",
-                    "신청기간": sinchung,
-                    "링크": "<a href='https://www.kotra.or.kr/subList/20000020753' style='color: #0066cc; font-weight: bold;'>[KOTRA 바로가기]</a>"
-                })
-    except Exception:
-        pass
+                for row in rows:
+                    text_content = row.text.strip()
+                    
+                    # 제목 태그 찾기
+                    title_tag = row.select_one('strong, .tit, a.title, p.title')
+                    title = title_tag.text.strip() if title_tag else text_content.split('\n')[0][:50]
+                    
+                    if len(title) < 5 or "메뉴" in title: continue
+                    
+                    period_match = re.search(r'신청기간\s*[:|]?\s*([0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2}.*?(?:~|-).*?[0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2})', text_content)
+                    sinchung = period_match.group(1).strip() if period_match else "상세 확인"
+                    
+                    if title not in [item['사업명'] for item in items]:
+                        items.append({
+                            "기관": "KOTRA",
+                            "매칭 키워드": keyword,
+                            "사업명": title,
+                            "공고일": "목록 참조",
+                            "신청기간": sinchung,
+                            "링크": "<a href='https://www.kotra.or.kr/subList/20000020753' style='color: #0066cc; font-weight: bold;'>[KOTRA 바로가기]</a>"
+                        })
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[KOTRA] 접속 에러: {e}")
     finally:
         if driver: driver.quit()
     return items
 
 def get_kepco():
-    # 한전 사이트는 필요시 추후 로직 추가 (현재는 빈 값 반환)
     return []
 
 def main():
@@ -265,7 +271,6 @@ def main():
     msg = MIMEMultipart()
     msg['Subject'] = f"[{datetime.date.today()}] 통합 ICT·AX 공고 리포트"
     
-    # 쉼표로 연결된 다중 이메일 발송 처리
     receiver_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
     msg['To'] = ", ".join(receiver_list) 
     msg.attach(MIMEText(html_body, 'html'))
