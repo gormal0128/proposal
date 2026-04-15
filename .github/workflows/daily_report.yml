@@ -2,22 +2,28 @@ name: Daily ICT Report
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 매일 한국 시간 오전 9시 (UTC 00:00)
-  workflow_dispatch:      # 수동 실행 버튼 활성화
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:  
+    env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: 코드를 가져옵니다
-        uses: actions/checkout@v4  # v3에서 v4로 업데이트
+        uses: actions/checkout@v4
 
       - name: 파이썬을 설치합니다
-        uses: actions/setup-python@v5  # v4에서 v5로 업데이트
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
+
+      # [추가됨] GitHub 서버에 크롬 브라우저를 설치합니다!
+      - name: Install Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
 
       - name: 라이브러리를 설치합니다
         run: |
@@ -31,10 +37,10 @@ jobs:
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
         run: python main.py
 
-      - name: 변경된 데이터(prev_data.json)를 저장합니다
+      - name: 변경된 데이터를 저장합니다
         run: |
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
           git add prev_data.json
-          git commit -m "Update previous data" || echo "No changes to commit"
+          git commit -m "Update previous data" || echo "No changes"
           git push
