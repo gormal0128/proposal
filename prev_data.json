@@ -1,12 +1,29 @@
 [
     {
-        "기관": "NIPA (테스트)",
-        "사업명": "[테스트] 2026년 유망 ICT·AX 기업 글로벌 진출 지원사업",
-        "신청기간": "2026.04.15 ~ 2026.05.10",
-        "링크": "<a href='https://www.nipa.kr'>[바로가기]</a>",
-        "협회 적합성": "분석실패",
-        "제안 아이디어": "에러: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
-        "상태": "🆕 신규",
-        "마감임박": "-"
+        "기관": "NIPA",
+        "사업명": "2026년 산업전문인력 AI역량강화 지원사업 서류평가 결과 및 발표평가 대상자 선정 공고",
+        "신청기간": "2026-04-08",
+        "링크": "<a href='https://www.nipa.kr/home/2-2/16691' style='color: #0066cc; text-decoration: none; font-weight: bold;'>[바로가기]</a>",
+        "협회 적합성": "분석중",
+        "제안 아이디어": "내용 확인 필요",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "NIPA",
+        "사업명": "2026년 1차 ICT 비즈니스 파트너십(아세안) 참가기업 모집",
+        "신청기간": "2026-04-06",
+        "링크": "<a href='https://www.nipa.kr/home/2-2/16682' style='color: #0066cc; text-decoration: none; font-weight: bold;'>[바로가기]</a>",
+        "협회 적합성": "분석중",
+        "제안 아이디어": "내용 확인 필요",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "NIPA",
+        "사업명": "2026년 AI·디지털전환 혁신기업 해외실증 지원 사업 참여기업 모집 공고",
+        "신청기간": "2026-04-06",
+        "링크": "<a href='https://www.nipa.kr/home/2-2/16676' style='color: #0066cc; text-decoration: none; font-weight: bold;'>[바로가기]</a>",
+        "협회 적합성": "분석중",
+        "제안 아이디어": "내용 확인 필요",
+        "상태": "🆕 신규"
     }
 ]
