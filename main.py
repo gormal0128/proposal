@@ -161,12 +161,18 @@ def main():
     
     msg = MIMEMultipart()
     msg['Subject'] = f"[{datetime.date.today()}] 통합 ICT·AX 공고 리포트"
-    msg['To'] = RECEIVER_EMAIL
+    
+    # [수정된 부분] 쉼표로 구분된 이메일을 리스트로 쪼개고 빈칸을 제거합니다.
+    receiver_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
+    
+    # 메일 봉투(헤더)에는 쉼표로 연결해서 보여줍니다.
+    msg['To'] = ", ".join(receiver_list) 
     msg.attach(MIMEText(html_body, 'html'))
     
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
         smtp.login(EMAIL_USER, EMAIL_PASS)
-        smtp.sendmail(EMAIL_USER, RECEIVER_EMAIL, msg.as_string())
+        # 실제 발송(sendmail) 시에는 쪼개진 '리스트' 형태를 전달해야 모두에게 발송됩니다.
+        smtp.sendmail(EMAIL_USER, receiver_list, msg.as_string())
 
     with open(db_file, 'w', encoding='utf-8') as f:
         valid_items = [d for d in processed_items if d['상태'] != '-']
