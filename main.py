@@ -7,6 +7,7 @@ import datetime
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 import re
 import time
 
@@ -20,9 +21,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 
 # =========================================================
-# ⚙️ 설정
+# ⚙️ 설정 (테스트 스위치)
 # =========================================================
-TEST_MODE = True # 터미널 출력 모드 (실무 적용 시 False 로 변경)
+TEST_MODE = True # 터미널 출력 모드 (이메일 안 보냄)
 
 TARGET_AGENCIES = ["NIPA", "기업마당", "IRIS", "NTIS"]
 TARGET_KEYWORDS = ['AI', 'AX', 'ICT', '실증', '시범', '테스트베드', '데이터', '스마트공장', '디지털전환', '수출', '스마트시티']
@@ -34,7 +35,7 @@ def get_chrome_driver():
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
     options.add_argument('window-size=1920x1080')
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
     service = Service(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
 
@@ -66,21 +67,22 @@ def get_nipa():
             period_match = re.search(r'신청기간\s*[:|]?\s*([0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2}.*?(?:~|-).*?[0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2})', row_text)
             sinchung = period_match.group(1).strip() if period_match else "상세 확인"
             
-            link = "https://www.nipa.kr" + a_tag['href'] if a_tag['href'].startswith('/') else a_tag['href']
-            gongo = normalize_date(row_text)
+            href = a_tag.get('href', '')
+            link = "https://www.nipa.kr" + href if href.startswith('/') else href
             
+            gongo = normalize_date(row_text)
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
+            
             items.append({
                 "기관": "NIPA", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
                 "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
             })
-            if TEST_MODE: print(f"  👉 [발견] {gongo} | {title[:20]}... | {link}")
     except Exception as e:
         print(f"[NIPA] 에러: {e}")
     return items
 
 # ---------------------------------------------------------
-# 2. 기업마당 (링크 추출 완벽 보강)
+# 2. 기업마당 (href 속성 다이렉트 추출)
 # ---------------------------------------------------------
 def get_bizinfo():
     print("\n[기업마당] 1~5페이지 스캔 시작...")
@@ -108,17 +110,18 @@ def get_bizinfo():
                 sinchung = tds[3].text.strip()
                 gongo = normalize_date(tds[6].text.strip())
                 
-                # [핵심 보강] 태그 전체 문자열을 뒤져서 PBLN_ 찾기
-                a_tag_str = str(title_tag)
-                pblancId_match = re.search(r'(PBLN_[A-Za-z0-9_]+)', a_tag_str)
-                link = f"https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId={pblancId_match.group(1)}" if pblancId_match else url
+                # [수정] 보내주신 HTML대로 href 주소 100% 그대로 활용!
+                href = title_tag.get('href', '')
+                if href and not href.startswith('javascript'):
+                    link = "https://www.bizinfo.go.kr" + href if href.startswith('/') else href
+                else:
+                    link = url # 만약의 경우를 위한 검색화면 링크
 
                 matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
                 items.append({
                     "기관": "기업마당", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
                     "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
                 })
-            if TEST_MODE: print(f"  👉 {page}페이지 완료 (총 {len(items)}건 누적)")
     except Exception as e:
         print(f"[기업마당] 에러: {e}")
     finally:
@@ -126,7 +129,7 @@ def get_bizinfo():
     return items
 
 # ---------------------------------------------------------
-# 3. IRIS (날짜 추출 보강)
+# 3. IRIS 
 # ---------------------------------------------------------
 def get_iris():
     print("\n[IRIS] 스캔 시작...")
@@ -148,7 +151,6 @@ def get_iris():
             title = title_tag.text.strip()
             if "안내" in title or "결과" in title: continue
             
-            # [핵심 보강] <span> 태그나 전체 텍스트에서 첫 번째 날짜 포맷 추출
             ancmDe_span = row.find(class_='ancmDe')
             if ancmDe_span:
                 gongo_match = re.search(r'(202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9])', ancmDe_span.text)
@@ -166,7 +168,6 @@ def get_iris():
                 "기관": "IRIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
                 "사업명": title, "공고일": gongo, "신청기간": "상세 접속 필요", "링크": link
             })
-            if TEST_MODE: print(f"  👉 [발견] {gongo} | {title[:20]}... | {link}")
     except Exception as e:
         print(f"[IRIS] 에러: {e}")
     finally:
@@ -174,7 +175,7 @@ def get_iris():
     return items
 
 # ---------------------------------------------------------
-# 4. NTIS (인덱스 의존 탈피)
+# 4. NTIS (href 속성 다이렉트 추출)
 # ---------------------------------------------------------
 def get_ntis():
     print("\n[NTIS] 스캔 시작...")
@@ -194,7 +195,6 @@ def get_ntis():
             
             title = title_tag.text.strip()
             
-            # [핵심 보강] td 인덱스를 믿지 않고 해당 줄에 있는 '모든 날짜'를 다 찾아서 조립
             dates = re.findall(r'(202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9])', row.text)
             if len(dates) >= 2:
                 gongo = normalize_date(dates[0])
@@ -206,17 +206,18 @@ def get_ntis():
                 gongo = "확인필요"
                 sinchung = "확인필요"
             
-            a_tag_str = str(title_tag)
-            # goView('12345') 형태의 숫자 ID 추출
-            id_match = re.search(r"['\"]([0-9]{4,})['\"]", a_tag_str)
-            link = f"https://www.ntis.go.kr/rndgate/eg/un/ra/view.do?pblancNo={id_match.group(1)}" if id_match else "링크 확인필요"
+            # [수정] 보내주신 HTML대로 href 주소 100% 활용
+            href = title_tag.get('href', '')
+            if href and not href.startswith('javascript'):
+                link = "https://www.ntis.go.kr" + href if href.startswith('/') else href
+            else:
+                link = "https://www.ntis.go.kr/rndgate/eg/un/ra/mng.do"
             
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
             items.append({
                 "기관": "NTIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
                 "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
             })
-            if TEST_MODE: print(f"  👉 [발견] {gongo} | {title[:20]}... | {link}")
     except Exception as e:
         print(f"[NTIS] 에러: {e}")
     finally:
@@ -232,12 +233,12 @@ def main():
     all_data.extend(get_iris()) 
     all_data.extend(get_ntis()) 
 
-    # [핵심] 테스트 시 14일 공고가 버려지지 않도록 타겟 날짜를 '최근 3일'로 넓힙니다.
     today = datetime.date.today()
+    # 어제, 그제 공고까지 넉넉히 확인
     target_dates = [
         (today).strftime("%Y-%m-%d"),
         (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
-        (today - datetime.timedelta(days=2)).strftime("%Y-%m-%d") # 14일 확보용
+        (today - datetime.timedelta(days=2)).strftime("%Y-%m-%d")
     ]
 
     email_items = [item for item in all_data if item['공고일'] in target_dates]
@@ -260,16 +261,51 @@ def main():
     df_daily = df_daily.drop(columns=['is_empty', 'has_keyword'])
 
     if TEST_MODE:
-        print(f"\n{'='*90}")
-        print(f"🎯 [최종 수집 결과] 최근 3일({target_dates[-1]} ~ {target_dates[0]}) 기준")
-        print(f"{'='*90}")
         pd.set_option('display.max_rows', None)
-        pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', 1000)
+        pd.set_option('display.max_colwidth', None) # 터미널에서 링크가 짤리지 않도록 세팅!
+        pd.set_option('display.width', 2000)
+        
+        print(f"\n{'='*100}")
+        print(f"🎯 [최종 수집 결과] 최근 3일({target_dates[-1]} ~ {target_dates[0]}) 기준")
+        print(f"{'='*100}")
         print(df_daily)
-        print(f"{'='*90}")
-        print("✅ 성공! 까만 화면 중간의 [발견] 로그와 위 표의 링크를 확인해 보세요.")
+        print(f"{'='*100}")
+        print("✅ 성공! 링크 주소들을 복사해서 인터넷 창에 붙여넣어 보세요!")
         return
+
+    # TEST_MODE = False 일 때 이메일 발송 로직
+    html_table = df_daily.copy()
+    html_table['링크'] = html_table['링크'].apply(lambda x: f"<a href='{x}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>" if x != '-' else '-')
+    
+    html_table_str = html_table.to_html(index=False, escape=False)
+    html_table_str = html_table_str.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-family: Arial; font-size: 13px; text-align: left; border: 1px solid #ddd;">')
+    html_table_str = html_table_str.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px; border: 1px solid #ccc; text-align: center; font-weight: bold; color:#1a73e8; white-space: nowrap;">')
+    html_table_str = html_table_str.replace('<td>', '<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle;">')
+
+    for keyword in TARGET_KEYWORDS:
+        html_table_str = html_table_str.replace(f'<td>{keyword}</td>', f'<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle; color: #d93025; font-weight: bold;">{keyword}</td>')
+
+    html_body = f"""
+    <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px;">
+            📋 통합 사업 공고 일일 리포트
+        </h2>
+        {html_table_str}
+    </div>
+    """
+    
+    msg = MIMEMultipart()
+    msg['Subject'] = f"[{today.strftime('%Y-%m-%d')}] 통합 공고 일일 리포트"
+    
+    receiver_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
+    msg['To'] = ", ".join(receiver_list) 
+    msg.attach(MIMEText(html_body, 'html'))
+    
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(EMAIL_USER, EMAIL_PASS)
+        smtp.sendmail(EMAIL_USER, receiver_list, msg.as_string())
+        
+    print("✅ 이메일 발송 완료!")
 
 if __name__ == "__main__":
     main()
