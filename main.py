@@ -19,15 +19,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.keys import Keys
 
 # =========================================================
-# ⚙️ 설정 (테스트 스위치)
+# ⚙️ 설정
 # =========================================================
-TEST_MODE = False # 터미널 출력 모드 (이메일 안 보냄)
+TEST_MODE = False # 실무 발송 모드 (이메일 발송)
 
 TARGET_AGENCIES = ["NIPA", "기업마당", "IRIS", "NTIS"]
 TARGET_KEYWORDS = ['AI', 'AX', 'ICT', '실증', '시범', '테스트베드', '데이터', '스마트공장', '디지털전환', '수출', '스마트시티']
+
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_PASS = os.getenv("EMAIL_PASS")
+RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
 
 def get_chrome_driver():
     options = Options()
@@ -83,7 +86,7 @@ def get_nipa():
     return items
 
 # ---------------------------------------------------------
-# 2. 기업마당
+# 2. 기업마당 (href 속성 다이렉트 추출)
 # ---------------------------------------------------------
 def get_bizinfo():
     print("\n[기업마당] 1~5페이지 스캔 시작...")
@@ -129,7 +132,7 @@ def get_bizinfo():
     return items
 
 # ---------------------------------------------------------
-# 3. IRIS (타임아웃 완벽 방지)
+# 3. IRIS 
 # ---------------------------------------------------------
 def get_iris():
     print("\n[IRIS] 스캔 시작...")
@@ -138,18 +141,8 @@ def get_iris():
     try:
         driver = get_chrome_driver()
         driver.get("https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do")
-        
-        # [핵심 변경] 리스트가 뜰 때까지 막연히 기다리지 않고, 
-        # 화면에 뜨자마자 검색창(bsnsTl)을 찾아냅니다. (이건 엄청 빨리 뜹니다)
-        search_input = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "bsnsTl")))
-        
-        # 검색창 값을 텅 비우고, 강제로 '엔터키'를 쳐서 
-        # 전체 리스트가 무조건 화면에 새로고침 되도록 만듭니다!
-        driver.execute_script("arguments[0].value = '';", search_input)
-        search_input.send_keys(Keys.ENTER)
-        
-        # 엔터 치고 표가 예쁘게 다 그려질 때까지 4초 대기
-        time.sleep(4) 
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".list_area li, tbody tr")))
+        time.sleep(3) 
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         rows = soup.select('.list_area li, tbody tr')
@@ -178,7 +171,6 @@ def get_iris():
                 "기관": "IRIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
                 "사업명": title, "공고일": gongo, "신청기간": "상세 접속 필요", "링크": link
             })
-            if TEST_MODE: print(f"  👉 [발견] {gongo} | {title[:20]}... | {link}")
     except Exception as e:
         print(f"[IRIS] 에러: {e}")
     finally:
@@ -186,7 +178,7 @@ def get_iris():
     return items
 
 # ---------------------------------------------------------
-# 4. NTIS
+# 4. NTIS (href 속성 다이렉트 추출)
 # ---------------------------------------------------------
 def get_ntis():
     print("\n[NTIS] 스캔 시작...")
@@ -244,12 +236,44 @@ def main():
     all_data.extend(get_ntis()) 
 
     today = datetime.date.today()
-    target_dates = [
-        (today).strftime("%Y-%m-%d"),
-        (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
-        (today - datetime.timedelta(days=2)).strftime("%Y-%m-%d")
-    ]
+    today_str = today.strftime("%Y-%m-%d")
+    yesterday_str = (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    day_before_str = (today - datetime.timedelta(days=2)).strftime("%Y-%m-%d")
+    
+    # 최근 3일 치 공고 메일 발송 대상으로 수집
+    target_dates = [today_str, yesterday_str, day_before_str]
 
+    # =========================================================
+    # [복구됨] 엑셀 생성을 위한 히스토리 누적 로직
+    # =========================================================
+    db_file = 'history.json'
+    if os.path.exists(db_file):
+        with open(db_file, 'r', encoding='utf-8') as f:
+            history_data = json.load(f)
+    else:
+        history_data = []
+
+    history_titles = [d.get('사업명', '') for d in history_data]
+    for item in all_data:
+        if item['사업명'] not in history_titles:
+            item['수집일'] = today_str # 수집된 날짜 도장 쾅!
+            history_data.append(item)
+
+    # 7일 치 히스토리만 엑셀로 저장
+    seven_days_ago_str = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    valid_history = [item for item in history_data if item.get('수집일', '9999-99-99') >= seven_days_ago_str]
+
+    excel_filename = "ICT_AX_공고_최근1주일.xlsx"
+    if valid_history:
+        df_history = pd.DataFrame(valid_history)
+        df_history = df_history[['수집일', '기관', '매칭 키워드', '사업명', '공고일', '신청기간', '링크']]
+        df_history['링크'] = df_history['링크'].str.extract(r"href='(.*?)'") # HTML 태그 제거
+        df_history = df_history.sort_values(by=['수집일', '기관'], ascending=[False, True])
+        df_history.to_excel(excel_filename, index=False)
+
+    # =========================================================
+    # 이메일 본문 생성 로직
+    # =========================================================
     email_items = [item for item in all_data if item['공고일'] in target_dates]
 
     found_agencies = set([item['기관'] for item in email_items])
@@ -257,7 +281,7 @@ def main():
         if agency not in found_agencies:
             email_items.append({
                 "기관": agency, "매칭 키워드": "-",
-                "사업명": "조건에 맞는 최근 공고가 없습니다.",
+                "사업명": f"조건에 맞는 최근({target_dates[-1]}~{target_dates[0]}) 공고가 없습니다.",
                 "공고일": "-", "신청기간": "-", "링크": "-"
             })
 
@@ -269,18 +293,67 @@ def main():
     df_daily = df_daily.sort_values(by=['is_empty', 'has_keyword', '공고일', '기관'], ascending=[True, True, False, True])
     df_daily = df_daily.drop(columns=['is_empty', 'has_keyword'])
 
+    # TEST_MODE 분기
     if TEST_MODE:
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_colwidth', None)
         pd.set_option('display.width', 2000)
-        
-        print(f"\n{'='*100}")
-        print(f"🎯 [최종 수집 결과] 최근 3일({target_dates[-1]} ~ {target_dates[0]}) 기준")
-        print(f"{'='*100}")
         print(df_daily)
-        print(f"{'='*100}")
-        print("✅ 성공! 링크 주소들을 복사해서 인터넷 창에 붙여넣어 보세요!")
+        print("✅ 터미널 테스트 완료 (이메일 발송 생략)")
         return
+
+    # 실무용 이메일 발송 처리
+    html_table = df_daily.copy()
+    html_table['링크'] = html_table['링크'].apply(lambda x: f"<a href='{x}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>" if x != '-' else '-')
+    
+    html_table_str = html_table.to_html(index=False, escape=False)
+    html_table_str = html_table_str.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-family: Arial; font-size: 13px; text-align: left; border: 1px solid #ddd;">')
+    html_table_str = html_table_str.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px; border: 1px solid #ccc; text-align: center; font-weight: bold; color:#1a73e8; white-space: nowrap;">')
+    html_table_str = html_table_str.replace('<td>', '<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle;">')
+
+    for keyword in TARGET_KEYWORDS:
+        html_table_str = html_table_str.replace(f'<td>{keyword}</td>', f'<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle; color: #d93025; font-weight: bold;">{keyword}</td>')
+
+    html_body = f"""
+    <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px;">
+            📋 통합 사업 공고 일일 리포트
+        </h2>
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; font-size: 13px; color: #333; line-height: 1.5;">
+            <strong>🎯 대상 기관:</strong> {', '.join(TARGET_AGENCIES)}<br>
+            <strong>🎯 하이라이트 키워드:</strong> {", ".join(TARGET_KEYWORDS)}<br><br>
+            <span style="color: #1a73e8; font-weight: bold;">* 본문에는 분야에 상관없이 최근 3일간 등록된 모든 공고가 나열됩니다.</span><br>
+            <span style="color: #e53935; font-weight: bold;">* 타겟 키워드가 매칭된 공고는 표의 최상단에 붉은색으로 우선 배치됩니다.</span><br>
+            <span style="color: #555; font-weight: bold;">* 1주일간의 누적 데이터는 하단 첨부파일(엑셀)을 확인해 주세요.</span>
+        </div>
+        {html_table_str}
+    </div>
+    """
+    
+    msg = MIMEMultipart()
+    msg['Subject'] = f"[{today.strftime('%Y-%m-%d')}] 통합 공고 일일 리포트 (엑셀 첨부)"
+    
+    receiver_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
+    msg['To'] = ", ".join(receiver_list) 
+    msg.attach(MIMEText(html_body, 'html'))
+    
+    # [복구됨] 엑셀 파일 메일에 첨부
+    if os.path.exists(excel_filename):
+        with open(excel_filename, 'rb') as f:
+            part = MIMEApplication(f.read(), Name=os.path.basename(excel_filename))
+        part['Content-Disposition'] = f'attachment; filename="{os.path.basename(excel_filename)}"'
+        msg.attach(part)
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(EMAIL_USER, EMAIL_PASS)
+        smtp.sendmail(EMAIL_USER, receiver_list, msg.as_string())
+        
+    print("\n✅ 성공! 엑셀 파일이 첨부된 이메일 발송 완료!")
+
+    # [복구됨] 데이터 누적 저장
+    with open(db_file, 'w', encoding='utf-8') as f:
+        json.dump(valid_history, f, ensure_ascii=False, indent=4)
+        print("✅ 성공! history.json 파일 업데이트 완료!")
 
 if __name__ == "__main__":
     main()
