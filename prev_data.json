@@ -34,5 +34,50 @@
         "신청기간": "상세 본문 참조",
         "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120847' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
         "상태": "🔄 진행"
+    },
+    {
+        "기관": "KOTRA",
+        "매칭 키워드": "수출",
+        "사업명": "특별 안내페이지",
+        "공고일": "목록 참조",
+        "신청기간": "상세 확인",
+        "링크": "<a href='https://www.kotra.or.kr/subList/20000020753' style='color: #0066cc; font-weight: bold;'>[KOTRA 바로가기]</a>",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "KOTRA",
+        "매칭 키워드": "수출",
+        "사업명": "KOTRA 수출물류 협업 네트워크",
+        "공고일": "목록 참조",
+        "신청기간": "상세 확인",
+        "링크": "<a href='https://www.kotra.or.kr/subList/20000020753' style='color: #0066cc; font-weight: bold;'>[KOTRA 바로가기]</a>",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "KOTRA",
+        "매칭 키워드": "수출",
+        "사업명": "특별 안내페이지",
+        "공고일": "목록 참조",
+        "신청기간": "상세 확인",
+        "링크": "<a href='https://www.kotra.or.kr/subList/20000020753' style='color: #0066cc; font-weight: bold;'>[KOTRA 바로가기]</a>",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "KOTRA",
+        "매칭 키워드": "수출",
+        "사업명": "KOTRA 수출물류 협업 네트워크",
+        "공고일": "목록 참조",
+        "신청기간": "상세 확인",
+        "링크": "<a href='https://www.kotra.or.kr/subList/20000020753' style='color: #0066cc; font-weight: bold;'>[KOTRA 바로가기]</a>",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "KOTRA",
+        "매칭 키워드": "수출",
+        "사업명": "일본 수출...",
+        "공고일": "목록 참조",
+        "신청기간": "상세 확인",
+        "링크": "<a href='https://www.kotra.or.kr/subList/20000020753' style='color: #0066cc; font-weight: bold;'>[KOTRA 바로가기]</a>",
+        "상태": "🆕 신규"
     }
 ]
