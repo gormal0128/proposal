@@ -1,11 +1,20 @@
 [
     {
         "기관": "NIPA",
+        "사업명": "싱가포르IT지원센터 2026년 상반기 입주기업 모집 공고",
+        "링크": "<a href='https://www.nipa.kr/home/2-2/16720' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "NIPA",
         "사업명": "2026년 1차 ICT 비즈니스 파트너십(아세안) 참가기업 모집",
         "링크": "<a href='https://www.nipa.kr/home/2-2/16682' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
         "신청기간": "직접 확인",
         "협회 적합성": "에러",
-        "제안 아이디어": "분석 실패 (로그 확인)",
+        "제안 아이디어": "분석 실패",
         "상태": "🔄 진행"
     },
     {
@@ -14,8 +23,8 @@
         "링크": "<a href='https://www.nipa.kr/home/2-2/16680' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
         "신청기간": "직접 확인",
         "협회 적합성": "에러",
-        "제안 아이디어": "분석 실패 (로그 확인)",
-        "상태": "🆕 신규"
+        "제안 아이디어": "분석 실패",
+        "상태": "🔄 진행"
     },
     {
         "기관": "NIPA",
@@ -23,7 +32,7 @@
         "링크": "<a href='https://www.nipa.kr/home/2-2/16676' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
         "신청기간": "직접 확인",
         "협회 적합성": "에러",
-        "제안 아이디어": "분석 실패 (로그 확인)",
+        "제안 아이디어": "분석 실패",
         "상태": "🔄 진행"
     },
     {
@@ -32,8 +41,8 @@
         "링크": "<a href='https://www.nipa.kr/home/2-2/16675' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
         "신청기간": "직접 확인",
         "협회 적합성": "에러",
-        "제안 아이디어": "분석 실패 (로그 확인)",
-        "상태": "🆕 신규"
+        "제안 아이디어": "분석 실패",
+        "상태": "🔄 진행"
     },
     {
         "기관": "NIPA",
@@ -41,16 +50,124 @@
         "링크": "<a href='https://www.nipa.kr/home/2-2/16668' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
         "신청기간": "직접 확인",
         "협회 적합성": "에러",
-        "제안 아이디어": "분석 실패 (로그 확인)",
+        "제안 아이디어": "분석 실패",
+        "상태": "🔄 진행"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "[전남] 2026년 AIㆍ데이터 스타트업 성장 지원사업 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120852' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
         "상태": "🆕 신규"
     },
     {
-        "기관": "NIPA",
-        "사업명": "「K-테크 파이오니어즈」 글로벌 한국 인재·팀 모집 공고",
-        "링크": "<a href='https://www.nipa.kr/home/2-2/16666' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "기관": "기업마당",
+        "사업명": "2026년 소공인 인프라시설 고도화 지원사업 모집 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120851' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
         "신청기간": "직접 확인",
         "협회 적합성": "에러",
-        "제안 아이디어": "분석 실패 (로그 확인)",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "2026년 중소기업 혁신 유공 포상 후보자 모집 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120850' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "2026년 1차 일반 물류바우처 사업 참여기업 모집 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120848' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "2026년 2차 수출지원기반활용사업 참여기업 모집 공고(중소벤처기업부 소관 수출바우처사업)",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120847' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "2026년 글로벌스케일업캠퍼스 인천 유니브-엑스(Univ. X) 참여기업 모집 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120846' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "[전남] 2026년 가정간편식 제품 개발 지원사업 지원기업 모집 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120844' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "2026년 아산시 단체관광객 유치 인센티브 지원계획 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120843' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "2026년 전북 글로벌게임센터 고도화 게임 제작지원사업 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120842' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "2026년 K-뷰티ㆍ헬스케어 현지진출 프로그램  참여기업 모집 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120841' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "2026년 혁신 프리미어 1000 녹색산업 우수기업 모집 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120840' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "[강원] 춘천시 2026년 생계형 1인 자영업자 사회보험료 지원 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120839' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
+        "상태": "🆕 신규"
+    },
+    {
+        "기관": "기업마당",
+        "사업명": "[강원] 춘천시 2026년 사회보험료(10인 미만) 지원 공고",
+        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120838' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "신청기간": "직접 확인",
+        "협회 적합성": "에러",
+        "제안 아이디어": "분석 실패",
         "상태": "🆕 신규"
     }
 ]
