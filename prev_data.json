@@ -1,1 +1,12 @@
-[]
+[
+    {
+        "기관": "NIPA (테스트)",
+        "사업명": "[테스트] 2026년 유망 ICT·AX 기업 글로벌 진출 지원사업",
+        "신청기간": "2026.04.15 ~ 2026.05.10",
+        "링크": "<a href='https://www.nipa.kr'>[바로가기]</a>",
+        "협회 적합성": "분석실패",
+        "제안 아이디어": "에러: 404 models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+        "상태": "🆕 신규",
+        "마감임박": "-"
+    }
+]
