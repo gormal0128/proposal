@@ -8,6 +8,13 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import re # [추가] 텍스트에서 날짜만 정확히 뽑아내는 정규표현식 라이브러리
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
 
 # 환경 변수 설정
 EMAIL_USER = os.getenv("EMAIL_USER")
@@ -84,7 +91,83 @@ def get_nipa(): return fetch_and_filter_board("NIPA", "https://www.nipa.kr/home/
 def get_nia(): return fetch_and_filter_board("NIA", "https://www.nia.or.kr/site/nia_kor/ex/bbs/List.do?cbIdx=78336", "https://www.nia.or.kr", css_selector='.board_list tbody tr, table tbody tr')
 def get_iris(): return fetch_and_filter_board("IRIS", "https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do", "https://www.iris.go.kr")
 def get_bizinfo(): return fetch_and_filter_board("기업마당", "https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do", "https://www.bizinfo.go.kr")
-def get_kotra(): return fetch_and_filter_board("KOTRA", "https://www.kotra.or.kr/subList/20000020753", "https://www.kotra.or.kr")
+def get_kotra():
+    """KOTRA 무역투자24 (Selenium 적용)"""
+    print("[KOTRA] 셀레니움 브라우저를 구동하여 스캔합니다...")
+    agency_name = "KOTRA"
+    base_url = "https://www.kotra.or.kr"
+    board_url = "https://www.kotra.or.kr/subList/20000020753"
+    
+    items = []
+    target_keywords = ['AI', 'AX', 'ICT', '실증', '시범', '테스트베드', '데이터', '스마트공장', '디지털전환', '수출', '스마트시티']
+    
+    # 보이지 않는(Headless) 크롬 세팅
+    options = Options()
+    options.add_argument('--headless') # 화면 안 띄우고 백그라운드 실행
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('window-size=1920x1080')
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    
+    driver = None
+    try:
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        
+        # KOTRA 페이지 접속
+        driver.get(board_url)
+        
+        # 데이터가 로딩될 때까지 최대 10초 대기 (리스트 컨테이너가 나타날 때까지)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".board-list, .list_type1")) # KOTRA 리스트 클래스
+        )
+        time.sleep(2) # 자바스크립트가 글자를 마저 채우도록 2초 더 여유를 줍니다.
+        
+        # 렌더링이 완료된 최종 HTML을 가져와서 BeautifulSoup으로 분석
+        html = driver.page_source
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # 캡처해주신 화면을 보면 박스 형태의 목록입니다.
+        rows = soup.select('.list_type1 > li, .board-list li') 
+        
+        for row in rows:
+            # 제목 및 링크 추출
+            title_tag = row.select_one('.tit a, a')
+            if not title_tag: continue
+                
+            title = title_tag.text.strip()
+            href = title_tag.get('href', '')
+            if href == '#' or 'javascript' in href:
+                # KOTRA는 클릭 시 상세페이지로 가는 방식이 복잡할 수 있으므로 보드 URL 유지
+                link = board_url 
+            else:
+                link = base_url + href if href.startswith('/') else href
+
+            # 키워드 매칭
+            matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
+            
+            if matched_kws:
+                # 신청기간 추출 (목록에 이미 신청기간이 적혀있으므로 바로 빼옵니다)
+                text_content = row.text
+                period_match = re.search(r'신청기간\s*[:|]?\s*([0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2}.*?(?:~|-).*?[0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2})', text_content)
+                sinchung = period_match.group(1).strip() if period_match else "직접 확인"
+                
+                items.append({
+                    "기관": agency_name,
+                    "매칭 키워드": ", ".join(matched_kws),
+                    "사업명": title,
+                    "공고일": "리스트 참조", # KOTRA는 목록에 공고일이 명확치 않음
+                    "신청기간": sinchung,
+                    "링크": f"<a href='{link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>"
+                })
+    except Exception as e:
+        print(f"[{agency_name}] 셀레니움 크롤링 에러: {e}")
+    finally:
+        if driver:
+            driver.quit() # 메모리 낭비를 막기 위해 브라우저 닫기
+            
+    return items
+    
 def get_kepco(): return fetch_and_filter_board("한국전력", "https://www.kepco.co.kr/eum/program/introduceNotice/boardList.do", "https://www.kepco.co.kr")
 
 
