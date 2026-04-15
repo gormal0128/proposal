@@ -9,89 +9,98 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import google.generativeai as genai
 
-# 1. 환경 변수 설정
+# 환경 변수 및 AI 설정
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
 
-# [수정 1] 최신 모델인 gemini-1.5-flash로 변경 (에러 해결)
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 def get_nipa_announcements():
-    """NIPA 공고 크롤링 (업데이트된 URL 적용)"""
-    # [수정 2] 정확한 NIPA 사업공고 URL 적용
+    """NIPA 목록 + 상세페이지 본문 크롤링"""
     url = "https://www.nipa.kr/home/2-2"
-    
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    headers = {'User-Agent': 'Mozilla/5.0'}
     items = []
     
     try:
         res = requests.get(url, headers=headers)
         soup = BeautifulSoup(res.text, 'html.parser')
-        
-        # 범용적인 테이블 Row 탐색
         rows = soup.select('tbody tr')
+        
         for row in rows:
             a_tag = row.select_one('a')
-            if not a_tag:
-                continue
+            if not a_tag: continue
                 
             title = a_tag.text.strip()
-            # href가 상대경로(/로 시작)일 경우와 절대경로일 경우 처리
             href = a_tag['href']
             link = "https://www.nipa.kr" + href if href.startswith('/') else href
             
-            # td 태그들 중에서 날짜 형식을 가진 텍스트 추출
-            cols = row.select('td')
-            date_range = "상시모집"
-            for col in cols:
-                if '-' in col.text or '.' in col.text and len(col.text.strip()) > 8:
-                    date_range = col.text.strip()
+            # [핵심 1] 불필요한 공고 제목 필터링 (결과, 안내, 취소 등 제외)
+            exclude_keywords = ['결과', '안내', '사전규격', '입찰', '취소', '연기', '설명회']
+            if any(ext in title for ext in exclude_keywords):
+                continue
             
-            if any(k in title for k in ['ICT', 'AI', 'AX', '디지털', '솔루션', '실증']):
+            # 타겟 키워드가 있는 공고만 상세페이지 진입
+            if any(k in title for k in ['ICT', 'AI', 'AX', '디지털', '솔루션', '실증', '모집', '지원']):
+                # [핵심 2] 상세 페이지 진입하여 본문 텍스트 가져오기
+                try:
+                    detail_res = requests.get(link, headers=headers)
+                    detail_soup = BeautifulSoup(detail_res.text, 'html.parser')
+                    # NIPA 상세 본문 영역을 대략적으로 잡아 텍스트 추출 (앞부분 1500자만 AI에게 전달)
+                    content_text = detail_soup.text
+                    content_text = ' '.join(content_text.split())[:1500] 
+                except:
+                    content_text = "본문 로드 실패"
+
                 items.append({
                     "기관": "NIPA",
                     "사업명": title,
-                    "신청기간": date_range,
-                    "링크": f"<a href='{link}' style='color: #0066cc; text-decoration: none; font-weight: bold;'>[바로가기]</a>"
+                    "링크": f"<a href='{link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+                    "본문": content_text # AI에게 전달할 데이터
                 })
     except Exception as e:
         print(f"크롤링 에러: {e}")
-
-    # (만약 사이트 구조 변경으로 못 가져올 경우를 대비한 든든한 테스트/예시 데이터)
-    if len(items) == 0:
-        items.append({
-            "기관": "NIPA",
-            "사업명": "2026년 온디바이스 AI 서비스 실증·확산 사업",
-            "신청기간": "2026.04.15 ~ 2026.05.10",
-            "링크": f"<a href='{url}' style='color: #0066cc; text-decoration: none; font-weight: bold;'>[바로가기]</a>"
-        })
-        items.append({
-            "기관": "NIA",
-            "사업명": "2026년 공공데이터·AI 활용 창업경진대회",
-            "신청기간": "2026.03.20 ~ 2026.04.18",
-            "링크": "<a href='https://www.nia.or.kr' style='color: #0066cc; text-decoration: none; font-weight: bold;'>[바로가기]</a>"
-        })
         
     return items
 
 def analyze_with_ai(item):
-    """Gemini를 사용해 적합성 및 아이디어 도출"""
+    """Gemini를 사용해 마감일, 적합성, 아이디어 한 번에 추출"""
     prompt = f"""
-    아래 공공기관 사업 공고 내용을 보고, ICT/AI 협회 관점에서의 '협회 적합성(상/중/하 중 택1)'과 이를 활용한 '제안 아이디어(명사형으로 끝나는 짧은 한 문장)'를 작성해.
-    사업명: {item['사업명']}
-    형식은 반드시 "적합성|아이디어" 형태로 출력해.
+    아래는 공공기관 사업 공고의 '제목'과 '상세 본문'의 일부야.
+    이 정보를 바탕으로 아래 3가지를 추출 및 작성해.
+
+    제목: {item['사업명']}
+    본문: {item['본문']}
+
+    [요청사항]
+    1. 신청기간: 본문에서 접수 마감일이나 신청 기간을 찾아내서 기입해. (예: 2026.04.12 ~ 04.23) 찾을 수 없으면 '링크 확인'이라고 적어.
+    2. 적합성: ICT/AI 협회 관점에서의 참여 적합성 (상/중/하 중 택1)
+    3. 아이디어: 이 사업을 활용해 협회가 할 수 있는 액션 아이디어 1문장
+
+    [출력형식]
+    반드시 아래처럼 '|' 기호로만 구분해서 딱 한 줄로만 대답해. 다른 부연설명은 절대 금지.
+    신청기간|적합성|아이디어
     """
+    
     try:
         response = model.generate_content(prompt)
-        ai_res = response.text.strip().split('|')
-        item['협회 적합성'] = f"<b>{ai_res[0].strip()}</b>"
-        item['제안 아이디어'] = ai_res[1].strip()
+        result = response.text.replace('\n', '').strip()
+        parts = result.split('|')
+        
+        if len(parts) >= 3:
+            item['신청기간'] = parts[0].strip()
+            item['협회 적합성'] = f"<b>{parts[1].strip()}</b>"
+            item['제안 아이디어'] = parts[2].strip()
+        else:
+            raise ValueError("AI 응답 형식 오류")
     except Exception as e:
-        item['협회 적합성'] = "분석중"
-        item['제안 아이디어'] = "내용 확인 필요"
+        print(f"AI 분석 에러: {e}")
+        item['신청기간'] = "직접 확인"
+        item['협회 적합성'] = "에러"
+        item['제안 아이디어'] = "분석 실패 (로그 확인)"
+        
     return item
 
 def main():
@@ -110,50 +119,34 @@ def main():
     for item in new_data:
         item = analyze_with_ai(item)
         
-        # [수정 3] 이모지를 활용한 직관적인 상태 표시
+        # 상태 표시 로직
         if item['사업명'] not in prev_titles:
             item['상태'] = "🆕 신규"
-        elif "04.18" in item['신청기간']: # 마감 임박 로직 예시
-            item['상태'] = "🚨 임박"
         else:
             item['상태'] = "🔄 진행"
             
         processed_items.append(item)
 
-    # 데이터프레임 생성 및 열 순서 깔끔하게 정렬
+    if not processed_items:
+        print("조건에 맞는 새 공고가 없습니다.")
+        return
+
+    # 출력할 항목만 선택 (본문은 메일 표에서 제외)
     df = pd.DataFrame(processed_items)
     df = df[['상태', '기관', '사업명', '신청기간', '협회 적합성', '제안 아이디어', '링크']]
     
-    # [수정 4] 이메일 표(Table) 디자인을 마크다운 표처럼 예쁘게 꾸미기 위한 CSS 주입
+    # HTML 표 디자인
     html_table = df.to_html(index=False, escape=False)
-    html_table = html_table.replace(
-        '<table border="1" class="dataframe">', 
-        '<table style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px; text-align: left; border: 1px solid #dddddd;">'
-    )
-    html_table = html_table.replace(
-        '<th>', 
-        '<th style="background-color: #f8f9fa; padding: 12px; border: 1px solid #dddddd; text-align: center; font-weight: bold; color: #333333;">'
-    )
-    html_table = html_table.replace(
-        '<td>', 
-        '<td style="padding: 10px; border: 1px solid #dddddd; vertical-align: middle;">'
-    )
+    html_table = html_table.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-family: Arial; font-size: 13px; text-align: left; border: 1px solid #ddd;">')
+    html_table = html_table.replace('<th>', '<th style="background-color: #f8f9fa; padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold;">')
+    html_table = html_table.replace('<td>', '<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle;">')
 
-    # 전체 메일 템플릿 디자인
     html_body = f"""
-    <div style="font-family: 'Malgun Gothic', Arial, sans-serif; max-width: 1100px; margin: 0 auto; padding: 20px;">
+    <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px;">
         <h2 style="color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px;">
             📋 [일일 리포트] ICT·AX 사업 공고 및 AI 인사이트
         </h2>
-        <p style="color: #555555; font-size: 14px; margin-bottom: 20px;">
-            AI가 매일 아침 분석한 각 기관별 공고와 <b>협회 맞춤형 제안 아이디어</b>입니다.<br>
-            (범례: 🆕 신규 공고 / 🚨 마감 임박 / 🔄 계속 진행 중)
-        </p>
         {html_table}
-        <br>
-        <p style="color: #999999; font-size: 12px; text-align: center;">
-            본 메일은 GitHub Actions와 파이썬 자동화를 통해 발송되었습니다.
-        </p>
     </div>
     """
     
@@ -167,6 +160,9 @@ def main():
         smtp.sendmail(EMAIL_USER, RECEIVER_EMAIL, msg.as_string())
 
     with open(db_file, 'w', encoding='utf-8') as f:
+        # 본문은 용량을 많이 차지하므로 DB 저장 시 제외
+        for d in processed_items:
+            d.pop('본문', None)
         json.dump(processed_items, f, ensure_ascii=False, indent=4)
 
 if __name__ == "__main__":
