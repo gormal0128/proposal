@@ -4,3 +4,4 @@ pandas
 google-generativeai
 selenium
 webdriver-manager
+openpyxl
