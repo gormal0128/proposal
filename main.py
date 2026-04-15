@@ -19,7 +19,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.keys import Keys
 
 # 환경 변수 설정
 EMAIL_USER = os.getenv("EMAIL_USER")
@@ -36,7 +35,7 @@ def get_chrome_driver():
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
     options.add_argument('window-size=1920x1080')
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
     service = Service(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
 
@@ -51,7 +50,7 @@ def extract_period(text):
     return match.group(1).strip() if match else "상세 확인"
 
 # ---------------------------------------------------------
-# 1. NIPA 전체 수집
+# 1. NIPA 수집
 # ---------------------------------------------------------
 def get_nipa():
     print("[NIPA] 전체 스캔 시작...")
@@ -66,14 +65,14 @@ def get_nipa():
             if not a_tag: continue
             
             title = a_tag.text.strip()
+            if "안내" in title or "결과" in title: continue
+            
             link = "https://www.nipa.kr" + a_tag['href'] if a_tag['href'].startswith('/') else a_tag['href']
             gongo = normalize_date(row.text)
             
-            # [변경] 모든 공고에 대해 키워드 포함 여부 검사
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
             kws_str = ", ".join(matched_kws) if matched_kws else "-"
             
-            # 상세 페이지에서 신청기간 추출
             try:
                 detail_res = requests.get(link, headers=headers, timeout=10)
                 sinchung = extract_period(BeautifulSoup(detail_res.text, 'html.parser').text)
@@ -81,11 +80,8 @@ def get_nipa():
                 sinchung = "상세 확인"
 
             items.append({
-                "기관": "NIPA", 
-                "매칭 키워드": kws_str,
-                "사업명": title, 
-                "공고일": gongo, 
-                "신청기간": sinchung,
+                "기관": "NIPA", "매칭 키워드": kws_str, "사업명": title, 
+                "공고일": gongo, "신청기간": sinchung,
                 "링크": f"<a href='{link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>"
             })
     except Exception as e:
@@ -93,7 +89,7 @@ def get_nipa():
     return items
 
 # ---------------------------------------------------------
-# 2. 기업마당 전체 수집
+# 2. 기업마당 수집 (구조 완벽 대응)
 # ---------------------------------------------------------
 def get_bizinfo():
     print("[기업마당] 전체 스캔 시작...")
@@ -101,22 +97,26 @@ def get_bizinfo():
     driver = None
     try:
         driver = get_chrome_driver()
+        # 검색 조작 없이 URL 접속만으로 최신 1페이지를 띄웁니다.
         driver.get("https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do")
-        time.sleep(4) # 리스트 로딩 대기
         
-        # [변경] 키워드 검색 반복문 제거. 접속 시 뜨는 전체 공고(기본 리스트)를 바로 긁습니다.
-        search_input = driver.find_element(By.ID, "keyword")
-        search_input.clear()
-        search_input.send_keys(Keys.ENTER) # 빈 검색어로 전체 새로고침
-        time.sleep(3)
+        # 표(tbody tr)가 로딩될 때까지 기다림
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, "tbody tr")))
+        time.sleep(2)
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
+        
         for row in soup.select('tbody tr'):
-            title_tag = row.select_one('a')
+            tds = row.find_all('td')
+            if len(tds) < 7: continue # 빈 줄 패스
+            
+            title_tag = tds[2].find('a')
             if not title_tag: continue
             
             title = title_tag.text.strip()
-            gongo = normalize_date(row.text)
+            # 캡처화면 구조: 4번째 칸(인덱스3)이 신청기간, 7번째 칸(인덱스6)이 등록일(공고일)
+            sinchung = tds[3].text.strip()
+            gongo = normalize_date(tds[6].text.strip())
             
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
             kws_str = ", ".join(matched_kws) if matched_kws else "-"
@@ -127,17 +127,12 @@ def get_bizinfo():
                 raw_link = f"https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId={pblancId_match.group(1)}"
                 link_html = f"<a href='{raw_link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>"
             else:
-                link_html = f"<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do' style='color: #0066cc; font-weight: bold;'>[검색화면]</a>"
+                link_html = "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do' style='color: #0066cc; font-weight: bold;'>[검색화면]</a>"
 
-            if title not in [i['사업명'] for i in items]:
-                items.append({
-                    "기관": "기업마당", 
-                    "매칭 키워드": kws_str,
-                    "사업명": title, 
-                    "공고일": gongo,
-                    "신청기간": "상세 링크 접속", 
-                    "링크": link_html
-                })
+            items.append({
+                "기관": "기업마당", "매칭 키워드": kws_str, "사업명": title, 
+                "공고일": gongo, "신청기간": sinchung, "링크": link_html
+            })
     except Exception as e:
         print(f"[기업마당] 에러: {e}")
     finally:
@@ -145,7 +140,7 @@ def get_bizinfo():
     return items
 
 # ---------------------------------------------------------
-# 3. IRIS 전체 수집
+# 3. IRIS 수집
 # ---------------------------------------------------------
 def get_iris():
     print("[IRIS] 전체 스캔 시작...")
@@ -154,56 +149,41 @@ def get_iris():
     try:
         driver = get_chrome_driver()
         driver.get("https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do")
-        time.sleep(4)
         
-        # [변경] 특정 키워드 검색 제거. 빈 값으로 엔터 쳐서 전체 목록 로딩
-        try:
-            search_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "bsnsTl")))
-            driver.execute_script("arguments[0].value = '';", search_input)
-            search_input.send_keys(Keys.ENTER)
-            time.sleep(4) 
+        # 검색 없이 1페이지 기본 렌더링 대기
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".list_area li, tbody tr")))
+        time.sleep(3) 
+        
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        rows = soup.find_all(lambda tag: tag.name in ['li', 'tr'] and '공고일자' in tag.text)
+        
+        for row in rows:
+            title_tag = row.select_one('a, .tit')
+            if not title_tag: continue
             
-            soup = BeautifulSoup(driver.page_source, 'html.parser')
-            rows = soup.find_all(lambda tag: tag.name in ['li', 'tr'] and '공고일자' in tag.text)
+            title = title_tag.text.strip()
+            if "안내" in title or "결과" in title: continue
+                
+            gongo_match = re.search(r'공고일자\s*[:|]?\s*(202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9])', row.text)
+            gongo = normalize_date(gongo_match.group(1)) if gongo_match else "확인필요"
             
-            for row in rows:
-                title_tag = row.select_one('a, .tit')
-                if not title_tag: continue
-                title = title_tag.text.strip()
-                
-                gongo_match = re.search(r'공고일자\s*[:|]?\s*(202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9])', row.text)
-                gongo = normalize_date(gongo_match.group(1)) if gongo_match else "확인필요"
-                
-                matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
-                kws_str = ", ".join(matched_kws) if matched_kws else "-"
-                
-                js_code = title_tag.get('onclick', '')
-                id_match = re.search(r"['\"]([A-Za-z0-9_]{10,})['\"]", js_code)
-                
-                if id_match and title not in [i['사업명'] for i in items]:
-                    detail_id = id_match.group(1)
-                    raw_link = f"https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituDtlView.do?pblancId={detail_id}"
-                    
-                    items.append({
-                        "기관": "IRIS", 
-                        "매칭 키워드": kws_str,
-                        "사업명": title, 
-                        "공고일": gongo, 
-                        "신청기간": "탐색 대기중", 
-                        "링크": f"<a href='{raw_link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
-                        "raw_link": raw_link
-                    })
-        except Exception as inner_e:
-            print(f"[IRIS] 파싱 에러: {inner_e}")
+            matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
+            kws_str = ", ".join(matched_kws) if matched_kws else "-"
             
-        # 수집된 상세 링크 순회하며 접수기간 추출
-        print(f"[IRIS] 총 {len(items)}개 전체 공고의 기간을 추출합니다...")
-        for item in items:
-            if 'raw_link' in item:
-                driver.get(item['raw_link'])
-                time.sleep(1.5) # 페이지별 짧은 대기
-                item['신청기간'] = extract_period(driver.page_source)
-
+            js_code = title_tag.get('onclick', '')
+            id_match = re.search(r"['\"]([A-Za-z0-9_]{10,})['\"]", js_code)
+            
+            if id_match:
+                detail_id = id_match.group(1)
+                raw_link = f"https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituDtlView.do?pblancId={detail_id}"
+                link_html = f"<a href='{raw_link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>"
+            else:
+                link_html = "<a href='https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do' style='color: #0066cc; font-weight: bold;'>[검색화면]</a>"
+                
+            items.append({
+                "기관": "IRIS", "매칭 키워드": kws_str, "사업명": title, 
+                "공고일": gongo, "신청기간": "상세 접속 필요", "링크": link_html
+            })
     except Exception as e:
         print(f"[IRIS] 에러: {e}")
     finally:
@@ -220,72 +200,68 @@ def main():
     all_data.extend(get_nipa())
     all_data.extend(get_bizinfo())
     all_data.extend(get_iris()) 
-    
-    for item in all_data:
-        item.pop('raw_link', None)
 
+    # --- [핵심] 날짜 기준 설정 ---
     today = datetime.date.today()
-    today_str = today.strftime("%Y-%m-%d")
+    yesterday = today - datetime.timedelta(days=1)
+    
+    target_date_str = yesterday.strftime("%Y-%m-%d") # 전일 (어제)
 
+    # 1. 엑셀 생성용 과거 데이터 누적
     db_file = 'history.json'
+    history_data = []
     if os.path.exists(db_file):
         with open(db_file, 'r', encoding='utf-8') as f:
             history_data = json.load(f)
-    else:
-        history_data = []
 
+    # 중복 없이 히스토리 추가
     history_titles = [d.get('사업명', '') for d in history_data]
-    
-    daily_new_items = []
-    found_agencies_today = set()
-
     for item in all_data:
-        # DB에 없는 '새로운 공고'만 수집
         if item['사업명'] not in history_titles:
-            item['수집일'] = today_str
-            daily_new_items.append(item)
             history_data.append(item)
-            found_agencies_today.add(item['기관'])
 
-    # 공고가 없는 기관 빈칸 처리
-    empty_agencies = set(TARGET_AGENCIES) - found_agencies_today
-    for agency in empty_agencies:
-        daily_new_items.append({
-            "기관": agency,
-            "매칭 키워드": "-",
-            "사업명": "<span style='color: #999;'>새로 등록된 공고가 없습니다.</span>",
-            "공고일": "-",
-            "신청기간": "-",
-            "링크": "-"
-        })
-
-    # 엑셀 파일 생성 (1주일 누적)
+    # 최근 1주일 치 데이터만 보관 및 엑셀 저장
     seven_days_ago_str = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
-    valid_history = [item for item in history_data if item.get('수집일', '9999-99-99') >= seven_days_ago_str]
+    valid_history = [item for item in history_data if item.get('공고일', '9999-99-99') >= seven_days_ago_str]
 
     excel_filename = "ICT_AX_공고_최근1주일.xlsx"
     if valid_history:
         df_history = pd.DataFrame(valid_history)
-        df_history = df_history[['수집일', '기관', '매칭 키워드', '사업명', '공고일', '신청기간', '링크']]
-        df_history['링크'] = df_history['링크'].str.extract(r"href='(.*?)'")
+        df_history = df_history[['기관', '매칭 키워드', '사업명', '공고일', '신청기간', '링크']]
+        df_history['링크'] = df_history['링크'].str.extract(r"href='(.*?)'") # HTML 태그 제거
+        df_history = df_history.sort_values(by=['공고일', '기관'], ascending=[False, True])
         df_history.to_excel(excel_filename, index=False)
 
-    # 이메일 본문 표 생성
-    df_daily = pd.DataFrame(daily_new_items)
+    # 2. 이메일 본문용 데이터 필터링 (무조건 공고일이 '어제'인 것만 추출!)
+    email_items = [item for item in all_data if item['공고일'] == target_date_str]
+
+    # 각 기관별로 공고가 있는지 체크하여 빈칸 안내 추가
+    found_agencies = set([item['기관'] for item in email_items])
+    for agency in TARGET_AGENCIES:
+        if agency not in found_agencies:
+            email_items.append({
+                "기관": agency,
+                "매칭 키워드": "-",
+                "사업명": f"<span style='color: #999;'>전일({target_date_str}) 기준으로 등록된 공고가 없습니다.</span>",
+                "공고일": "-", "신청기간": "-", "링크": "-"
+            })
+
+    df_daily = pd.DataFrame(email_items)
     df_daily = df_daily[['기관', '매칭 키워드', '사업명', '공고일', '신청기간', '링크']]
     
-    # [핵심] 정렬 로직: 1순위(키워드 있는 것 위로), 2순위(기관명)
+    # 정렬: 1순위(키워드 매칭 여부), 2순위(공고 없음 문구 맨 뒤로), 3순위(기관명)
+    df_daily['is_empty'] = df_daily['공고일'].apply(lambda x: 1 if x == '-' else 0)
     df_daily['has_keyword'] = df_daily['매칭 키워드'].apply(lambda x: 1 if x == '-' else 0)
-    df_daily = df_daily.sort_values(by=['has_keyword', '기관'])
-    df_daily = df_daily.drop(columns=['has_keyword'])
+    df_daily = df_daily.sort_values(by=['is_empty', 'has_keyword', '기관'])
+    df_daily = df_daily.drop(columns=['is_empty', 'has_keyword'])
 
-    # 데이터프레임을 HTML 표로 예쁘게 변환
+    # HTML 변환 및 디자인
     html_table = df_daily.to_html(index=False, escape=False)
     html_table = html_table.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-family: Arial; font-size: 13px; text-align: left; border: 1px solid #ddd;">')
     html_table = html_table.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px; border: 1px solid #ccc; text-align: center; font-weight: bold; color:#1a73e8; white-space: nowrap;">')
     html_table = html_table.replace('<td>', '<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle;">')
 
-    # 키워드가 매칭된 행의 글자색을 파란색으로 돋보이게 하는 약간의 HTML 꼼수
+    # 키워드 매칭된 행 글자색 붉은색 강조
     for keyword in TARGET_KEYWORDS:
         html_table = html_table.replace(f'<td>{keyword}</td>', f'<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle; color: #d93025; font-weight: bold;">{keyword}</td>')
 
@@ -293,20 +269,20 @@ def main():
     html_body = f"""
     <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px;">
         <h2 style="color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px;">
-            📋 전 부처 신규 사업 공고 일일 리포트
+            📋 통합 사업 공고 일일 리포트 (기준일: {target_date_str})
         </h2>
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; font-size: 13px; color: #333; line-height: 1.5;">
             <strong>🎯 대상 기관:</strong> NIPA, 기업마당, IRIS<br>
             <strong>🎯 하이라이트 키워드:</strong> {keyword_string}<br><br>
-            <span style="color: #1a73e8; font-weight: bold;">* 본문에는 분야에 상관없이 어제 새롭게 등록된 모든 공고가 나열됩니다.</span><br>
-            <span style="color: #e53935; font-weight: bold;">* 타겟 키워드가 매칭된 공고는 표의 최상단에 우선 배치됩니다.</span>
+            <span style="color: #1a73e8; font-weight: bold;">* 본문에는 분야에 상관없이 어제({target_date_str}) 새롭게 등록된 모든 공고가 나열됩니다.</span><br>
+            <span style="color: #e53935; font-weight: bold;">* 타겟 키워드가 매칭된 공고는 표의 최상단에 붉은색으로 우선 배치됩니다.</span>
         </div>
         {html_table}
     </div>
     """
     
     msg = MIMEMultipart()
-    msg['Subject'] = f"[{today.strftime('%Y-%m-%d')}] 통합 공고 일일 리포트 (키워드 매칭 포함)"
+    msg['Subject'] = f"[{today.strftime('%Y-%m-%d')}] 통합 공고 일일 리포트"
     
     receiver_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
     msg['To'] = ", ".join(receiver_list) 
