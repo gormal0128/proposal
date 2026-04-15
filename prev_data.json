@@ -3,54 +3,32 @@
         "기관": "NIPA",
         "사업명": "2026년 1차 ICT 비즈니스 파트너십(아세안) 참가기업 모집",
         "링크": "<a href='https://www.nipa.kr/home/2-2/16682' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "공고일": "확인필요",
         "신청기간": "확인필요",
-        "협회 적합성": "오류",
-        "제안 아이디어": "에러: 404 models/gemini-1.5-flash is not found for API v",
         "상태": "🔄 진행"
     },
     {
         "기관": "NIPA",
         "사업명": "2026년 AI·디지털전환 혁신기업 해외실증 지원 사업 참여기업 모집 공고",
         "링크": "<a href='https://www.nipa.kr/home/2-2/16676' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "공고일": "확인필요",
         "신청기간": "확인필요",
-        "협회 적합성": "오류",
-        "제안 아이디어": "에러: 404 models/gemini-1.5-flash is not found for API v",
         "상태": "🔄 진행"
-    },
-    {
-        "기관": "NIPA",
-        "사업명": "[재공고]2026년 소프트웨어 인재키움 사업 수행지역 및 기관 선정 공고",
-        "링크": "<a href='https://www.nipa.kr/home/2-2/16671' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
-        "신청기간": "확인필요",
-        "협회 적합성": "오류",
-        "제안 아이디어": "에러: 404 models/gemini-1.5-flash is not found for API v",
-        "상태": "🆕 신규"
     },
     {
         "기관": "기업마당",
         "사업명": "[전남] 2026년 AIㆍ데이터 스타트업 성장 지원사업 공고",
         "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120852' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "공고일": "확인필요",
         "신청기간": "확인필요",
-        "협회 적합성": "오류",
-        "제안 아이디어": "에러: 404 models/gemini-1.5-flash is not found for API v",
-        "상태": "🔄 진행"
-    },
-    {
-        "기관": "기업마당",
-        "사업명": "2026년 1차 일반 물류바우처 사업 참여기업 모집 공고",
-        "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120848' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
-        "신청기간": "확인필요",
-        "협회 적합성": "오류",
-        "제안 아이디어": "에러: 404 models/gemini-1.5-flash is not found for API v",
         "상태": "🔄 진행"
     },
     {
         "기관": "기업마당",
         "사업명": "2026년 2차 수출지원기반활용사업 참여기업 모집 공고(중소벤처기업부 소관 수출바우처사업)",
         "링크": "<a href='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120847' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
+        "공고일": "확인필요",
         "신청기간": "확인필요",
-        "협회 적합성": "오류",
-        "제안 아이디어": "에러: 404 models/gemini-1.5-flash is not found for API v",
         "상태": "🔄 진행"
     }
 ]
