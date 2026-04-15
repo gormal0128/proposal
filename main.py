@@ -7,26 +7,20 @@ import datetime
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import google.generativeai as genai
-import time
+import re # [추가] 텍스트에서 날짜만 정확히 뽑아내는 정규표현식 라이브러리
 
-# 환경 변수 및 AI 설정
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# 환경 변수 설정
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
-
-# [수정 1] 검색할 대상 기관과 키워드를 상단에 명확히 정의
 TARGET_AGENCIES = ["NIPA", "기업마당", "NIA", "IRIS", "KOTRA", "한국전력"]
 TARGET_KEYWORDS = ['AI', 'AX', 'ICT', '실증', '시범', '테스트베드', '데이터', '스마트공장', '디지털전환', '수출', '스마트시티']
 
 def fetch_and_filter_board(agency_name, board_url, base_url, css_selector='tbody tr'):
-    """기관별 게시판 크롤링 및 키워드 필터링"""
+    """기관별 게시판 크롤링 및 날짜 직접 추출"""
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     }
     items = []
     exclude_keywords = ['결과', '안내', '사전규격', '입찰', '취소', '연기', '설명회', '합격', '명단']
@@ -46,23 +40,40 @@ def fetch_and_filter_board(agency_name, board_url, base_url, css_selector='tbody
             
             if any(ext in title for ext in exclude_keywords): continue
             
-            # [수정 2] 어떤 키워드에 매칭되었는지 찾아내기
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
             
             if matched_kws:
+                # ----------------------------------------------------
+                # [핵심 변경] 상세페이지에 직접 접속해서 날짜 텍스트를 뜯어옵니다.
+                # ----------------------------------------------------
                 try:
                     detail_res = requests.get(link, headers=headers, timeout=10)
                     detail_soup = BeautifulSoup(detail_res.text, 'html.parser')
-                    content_text = ' '.join(detail_soup.text.split())[:2000] 
+                    
+                    # 태그를 제외한 순수 텍스트만 가져옴
+                    detail_text = detail_soup.get_text(separator=' ') 
+                    
+                    # 1. 신청기간 추출 (정규표현식 사용)
+                    # "신청기간" 글자 뒤에 나오는 "0000.00.00 ~ 0000.00.00" 형태의 패턴을 찾음
+                    period_match = re.search(r'신청기간\s*[:|]?\s*([0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2}.*?(?:~|-).*?[0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2})', detail_text)
+                    sinchung = period_match.group(1).strip() if period_match else "상세 본문 참조"
+                    
+                    # 2. 공고일 추출
+                    # 웹페이지 상단(작성자 이름 옆 등)에 등장하는 첫 번째 날짜 포맷을 공고일로 간주
+                    dates = re.findall(r'\b202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9]\b', detail_text)
+                    gongo = dates[0] if dates else "확인필요"
+                    
                 except:
-                    content_text = "본문 로드 실패"
+                    gongo = "로드 실패"
+                    sinchung = "로드 실패"
 
                 items.append({
                     "기관": agency_name,
+                    "매칭 키워드": ", ".join(matched_kws),
                     "사업명": title,
-                    "매칭 키워드": ", ".join(matched_kws), # 매칭된 키워드 저장
-                    "링크": f"<a href='{link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>",
-                    "본문": content_text
+                    "공고일": gongo,
+                    "신청기간": sinchung,
+                    "링크": f"<a href='{link}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>"
                 })
     except Exception as e:
         print(f"[{agency_name}] 크롤링 에러: {e}")
@@ -76,34 +87,6 @@ def get_bizinfo(): return fetch_and_filter_board("기업마당", "https://www.bi
 def get_kotra(): return fetch_and_filter_board("KOTRA", "https://www.kotra.or.kr/subList/20000020753", "https://www.kotra.or.kr")
 def get_kepco(): return fetch_and_filter_board("한국전력", "https://www.kepco.co.kr/eum/program/introduceNotice/boardList.do", "https://www.kepco.co.kr")
 
-def analyze_dates_with_ai(item):
-    """[수정 3] AI가 무조건 JSON 형태로만 대답하도록 강제하여 파싱 에러 방지"""
-    prompt = f"""
-    아래 본문을 읽고 '공고일'과 '신청기간'을 추출해서 반드시 JSON 형식으로만 응답해. 다른 부연설명은 절대 금지.
-    제목: {item['사업명']}
-    본문: {item['본문']}
-
-    [응답 형식 예시]
-    {{"공고일": "2026.04.06", "신청기간": "2026.04.12 ~ 2026.04.23"}}
-    (날짜를 찾을 수 없으면 "상세페이지 참조"라고 적어줘)
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        # AI가 마크다운(```json)을 붙여도 안전하게 벗겨내는 로직
-        res_text = response.text.replace("```json", "").replace("```", "").strip()
-        
-        # JSON 문자열을 파이썬 딕셔너리로 변환
-        date_data = json.loads(res_text)
-        
-        item['공고일'] = date_data.get('공고일', '확인필요')
-        item['신청기간'] = date_data.get('신청기간', '확인필요')
-        
-    except Exception as e:
-        item['공고일'] = "AI 추출 에러"
-        item['신청기간'] = "AI 추출 에러"
-        
-    return item
 
 def main():
     print("통합 크롤링 시작...")
@@ -116,6 +99,7 @@ def main():
     all_new_data.extend(get_kotra())
     all_new_data.extend(get_kepco())
     
+    # DB 비교 로직 (기존과 동일)
     db_file = 'prev_data.json'
     if os.path.exists(db_file):
         with open(db_file, 'r', encoding='utf-8') as f:
@@ -125,23 +109,17 @@ def main():
 
     processed_items = []
     prev_titles = [d.get('사업명', '') for d in prev_data]
-    found_agencies = set() # 공고가 발견된 기관을 기록
-
-    print(f"총 {len(all_new_data)}개 공고 날짜 추출 중...")
+    found_agencies = set()
 
     for item in all_new_data:
         found_agencies.add(item['기관'])
-        item = analyze_dates_with_ai(item)
-        
         if item['사업명'] not in prev_titles:
             item['상태'] = "🆕 신규"
         else:
             item['상태'] = "🔄 진행"
-            
         processed_items.append(item)
-        time.sleep(2)
 
-    # [수정 4] 검색 결과가 없는 기관 처리
+    # 검색 결과가 없는 기관 처리
     empty_agencies = set(TARGET_AGENCIES) - found_agencies
     for agency in empty_agencies:
         processed_items.append({
@@ -154,21 +132,18 @@ def main():
             "링크": "-"
         })
 
-    # 열 순서 지정 및 정렬 (상태 > 기관명 순)
+    # 출력 설정
     df = pd.DataFrame(processed_items)
     df = df[['상태', '기관', '매칭 키워드', '사업명', '공고일', '신청기간', '링크']]
-    # 결과가 있는 공고가 위로 오도록 정렬
     df['sort_order'] = df['상태'].apply(lambda x: 1 if x in ['🆕 신규', '🔄 진행'] else 2)
     df = df.sort_values(by=['sort_order', '기관'])
     df = df.drop(columns=['sort_order'])
 
-    # HTML 표 생성
     html_table = df.to_html(index=False, escape=False)
     html_table = html_table.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-family: Arial; font-size: 13px; text-align: left; border: 1px solid #ddd;">')
     html_table = html_table.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px; border: 1px solid #ccc; text-align: center; font-weight: bold; color:#1a73e8; white-space: nowrap;">')
     html_table = html_table.replace('<td>', '<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle;">')
 
-    # [수정 5] 적용된 전체 키워드 목록 상단 표출
     keyword_string = ", ".join(TARGET_KEYWORDS)
     
     html_body = f"""
@@ -194,10 +169,7 @@ def main():
         smtp.sendmail(EMAIL_USER, RECEIVER_EMAIL, msg.as_string())
 
     with open(db_file, 'w', encoding='utf-8') as f:
-        # 빈 데이터(-)를 저장할 필요는 없으므로 제거 후 저장
         valid_items = [d for d in processed_items if d['상태'] != '-']
-        for d in valid_items:
-            d.pop('본문', None)
         json.dump(valid_items, f, ensure_ascii=False, indent=4)
 
 if __name__ == "__main__":
