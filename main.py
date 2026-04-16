@@ -7,7 +7,6 @@ import datetime
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
 import re
 import time
 
@@ -77,7 +76,6 @@ def get_nipa():
             gongo = normalize_date(row_text)
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
             
-            # [수정] 키워드를 예쁜 분홍색(Pink-Red)으로 직접 하이라이트
             styled_kws = ", ".join([f"<span style='color: #e83e8c; font-weight: bold;'>{k}</span>" for k in matched_kws]) if matched_kws else "-"
             
             items.append({
@@ -137,7 +135,7 @@ def get_bizinfo():
     return items
 
 # ---------------------------------------------------------
-# 3. IRIS (수정됨: 정확한 URL 및 접수기간 추출)
+# 3. IRIS
 # ---------------------------------------------------------
 def get_iris():
     print("\n[IRIS] 스캔 시작...")
@@ -168,14 +166,11 @@ def get_iris():
                 
             gongo = normalize_date(gongo_match.group(1)) if gongo_match else "확인필요"
             
-            # [수정 1] 아이디 추출 조건 완화 (6자리 등 짧은 ID도 잡을 수 있도록 수정)
             a_tag_str = str(title_tag)
             id_match = re.search(r"['\"]([A-Za-z0-9_]{5,15})['\"]", a_tag_str)
             
-            # [수정 2] 제보해주신 정확한 IRIS 상세페이지 URL 적용
             link = f"https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId={id_match.group(1)}&ancmPrg=ancmIng" if id_match else "상세링크 확인필요"
             
-            # [수정 3] 접수기간 추출을 위해 다이렉트 링크로 몰래 한 번 더 접속
             sinchung = "상세 접속 필요"
             if id_match:
                 try:
@@ -183,7 +178,6 @@ def get_iris():
                     det_soup = BeautifulSoup(det_res.text, 'html.parser')
                     det_text = det_soup.get_text(separator=' ')
                     
-                    # 상세페이지 내 "접수기간 2026-04-14 ~ 2026-05-14" 패턴 추출
                     period_match = re.search(r'접수기간\s*[:|]?\s*([0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2}.*?(?:~|-).*?[0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2})', det_text)
                     if period_match:
                         sinchung = period_match.group(1).strip()
@@ -272,7 +266,7 @@ def main():
     target_dates = [today_str, yesterday_str, day_before_str]
 
     # =========================================================
-    # 엑셀 생성을 위한 히스토리 누적 로직
+    # 히스토리 누적 로직 (새 공고 판별용으로만 사용)
     # =========================================================
     db_file = 'history.json'
     if os.path.exists(db_file):
@@ -289,16 +283,6 @@ def main():
 
     seven_days_ago_str = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
     valid_history = [item for item in history_data if item.get('수집일', '9999-99-99') >= seven_days_ago_str]
-
-    excel_filename = "ICT_AX_공고_최근1주일.xlsx"
-    if valid_history:
-        df_history = pd.DataFrame(valid_history)
-        df_history = df_history[['수집일', '기관', '매칭 키워드', '사업명', '공고일', '신청기간', '링크']]
-        # 엑셀에는 HTML 태그가 그대로 들어가면 지저분하므로 제거해줍니다.
-        df_history['매칭 키워드'] = df_history['매칭 키워드'].str.replace(r"<[^>]*>", "", regex=True)
-        df_history['링크'] = df_history['링크'].str.extract(r"href='(.*?)'") 
-        df_history = df_history.sort_values(by=['수집일', '기관'], ascending=[False, True])
-        df_history.to_excel(excel_filename, index=False)
 
     # =========================================================
     # 이메일 본문 생성 로직
@@ -347,31 +331,24 @@ def main():
             <strong>🎯 대상 기관:</strong> {', '.join(TARGET_AGENCIES)}<br>
             <strong>🎯 하이라이트 키워드:</strong> {", ".join(TARGET_KEYWORDS)}<br><br>
             <span style="color: #1a73e8; font-weight: bold;">* 본문에는 분야에 상관없이 최근 3일간 등록된 모든 공고가 나열됩니다.</span><br>
-            <span style="color: #e83e8c; font-weight: bold;">* 타겟 키워드가 매칭된 공고는 표의 최상단에 우선 배치됩니다.</span><br>
-            <span style="color: #555; font-weight: bold;">* 1주일간의 누적 데이터는 하단 첨부파일(엑셀)을 확인해 주세요.</span>
+            <span style="color: #e83e8c; font-weight: bold;">* 타겟 키워드가 매칭된 공고는 표의 최상단에 우선 배치됩니다.</span>
         </div>
         {html_table_str}
     </div>
     """
     
     msg = MIMEMultipart()
-    msg['Subject'] = f"[{today.strftime('%Y-%m-%d')}] 통합 공고 일일 리포트 (엑셀 첨부)"
+    msg['Subject'] = f"[{today.strftime('%Y-%m-%d')}] 통합 공고 일일 리포트"
     
     receiver_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
     msg['To'] = ", ".join(receiver_list) 
     msg.attach(MIMEText(html_body, 'html'))
-    
-    if os.path.exists(excel_filename):
-        with open(excel_filename, 'rb') as f:
-            part = MIMEApplication(f.read(), Name=os.path.basename(excel_filename))
-        part['Content-Disposition'] = f'attachment; filename="{os.path.basename(excel_filename)}"'
-        msg.attach(part)
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
         smtp.login(EMAIL_USER, EMAIL_PASS)
         smtp.sendmail(EMAIL_USER, receiver_list, msg.as_string())
         
-    print("\n✅ 성공! 엑셀 파일이 첨부된 이메일 발송 완료!")
+    print("\n✅ 성공! 이메일 발송 완료!")
 
     with open(db_file, 'w', encoding='utf-8') as f:
         json.dump(valid_history, f, ensure_ascii=False, indent=4)
