@@ -132,7 +132,7 @@ def get_bizinfo():
     return items
 
 # ---------------------------------------------------------
-# 3. IRIS (수정됨: 확실한 DOM 타겟팅 적용)
+# 3. IRIS (수정됨: 상세페이지 접속하여 접수기간 추출)
 # ---------------------------------------------------------
 def get_iris():
     print("\n[IRIS] 스캔 시작...")
@@ -142,13 +142,10 @@ def get_iris():
         driver = get_chrome_driver()
         driver.get("https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do")
         
-        # [수정] 무작정 기다리는 대신, '공고일자'라는 텍스트가 화면에 그려질 때까지 대기
         WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '공고일자')]")))
         time.sleep(3) 
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-        
-        # [수정] 클래스명(list_area)에 의존하지 않고, '공고일자' 글씨를 포함하는 li, tr 덩어리를 싹 다 긁어옴
         rows = soup.find_all(lambda tag: tag.name in ['li', 'tr'] and '공고일자' in tag.text)
         
         for row in rows:
@@ -158,7 +155,6 @@ def get_iris():
             title = title_tag.text.strip()
             if "안내" in title or "결과" in title: continue
             
-            # 공고일 추출 (기존 작성자님 로직 그대로)
             ancmDe_span = row.find(class_='ancmDe')
             if ancmDe_span:
                 gongo_match = re.search(r'(202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9])', ancmDe_span.text)
@@ -167,18 +163,34 @@ def get_iris():
                 
             gongo = normalize_date(gongo_match.group(1)) if gongo_match else "확인필요"
             
-            # 상세 링크 추출 (기존 작성자님 로직 그대로)
             a_tag_str = str(title_tag)
             id_match = re.search(r"['\"]([A-Za-z0-9_]{10,})['\"]", a_tag_str)
             link = f"https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituDtlView.do?pblancId={id_match.group(1)}" if id_match else "상세링크 확인필요"
+            
+            # ---------------------------------------------------------
+            # [추가된 핵심 로직] 조립된 상세 링크로 접속하여 '접수기간' 뜯어오기
+            # ---------------------------------------------------------
+            sinchung = "상세 확인"
+            if id_match:
+                try:
+                    det_res = requests.get(link, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+                    det_soup = BeautifulSoup(det_res.text, 'html.parser')
+                    det_text = det_soup.get_text(separator=' ')
+                    
+                    # 상세페이지에 있는 "접수기간 2026-04-14 ~ 2026-05-14" 패턴 추출
+                    period_match = re.search(r'접수기간\s*[:|]?\s*([0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2}.*?(?:~|-).*?[0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2})', det_text)
+                    if period_match:
+                        sinchung = period_match.group(1).strip()
+                except:
+                    sinchung = "상세페이지 로드 에러"
+            # ---------------------------------------------------------
                 
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
             
-            # 중복 수집 방지 (li 태그가 중첩된 경우 대비)
             if title not in [item['사업명'] for item in items]:
                 items.append({
                     "기관": "IRIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
-                    "사업명": title, "공고일": gongo, "신청기간": "상세 접속 필요", "링크": link
+                    "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
                 })
     except Exception as e:
         print(f"[IRIS] 에러: {e}")
@@ -253,7 +265,7 @@ def main():
     target_dates = [today_str, yesterday_str, day_before_str]
 
     # =========================================================
-    # [복구됨] 엑셀 생성을 위한 히스토리 누적 로직
+    # 엑셀 생성을 위한 히스토리 누적 로직
     # =========================================================
     db_file = 'history.json'
     if os.path.exists(db_file):
@@ -346,7 +358,7 @@ def main():
     msg['To'] = ", ".join(receiver_list) 
     msg.attach(MIMEText(html_body, 'html'))
     
-    # [복구됨] 엑셀 파일 메일에 첨부
+    # 엑셀 파일 메일에 첨부
     if os.path.exists(excel_filename):
         with open(excel_filename, 'rb') as f:
             part = MIMEApplication(f.read(), Name=os.path.basename(excel_filename))
@@ -359,7 +371,7 @@ def main():
         
     print("\n✅ 성공! 엑셀 파일이 첨부된 이메일 발송 완료!")
 
-    # [복구됨] 데이터 누적 저장
+    # 데이터 누적 저장
     with open(db_file, 'w', encoding='utf-8') as f:
         json.dump(valid_history, f, ensure_ascii=False, indent=4)
         print("✅ 성공! history.json 파일 업데이트 완료!")
