@@ -1024,5 +1024,23 @@
         "신청기간": "상세 접속 필요",
         "링크": "상세링크 확인필요",
         "수집일": "2026-04-16"
+    },
+    {
+        "기관": "기업마당",
+        "매칭 키워드": "-",
+        "사업명": "2026년 하반기 중소기업기술혁신개발사업 유망기술개발(구조혁신R&D) 시행계획 공고",
+        "공고일": "2026-04-15",
+        "신청기간": "2026-04-23 ~ 2026-07-06",
+        "링크": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=1&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120845",
+        "수집일": "2026-04-16"
+    },
+    {
+        "기관": "기업마당",
+        "매칭 키워드": "-",
+        "사업명": "2026년 전통시장 및 상점가 활성화 유공 포상 계획 공고",
+        "공고일": "2026-04-15",
+        "신청기간": "2026-04-15 ~ 2026-05-11",
+        "링크": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=1&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120834",
+        "수집일": "2026-04-16"
     }
 ]
