@@ -1042,5 +1042,32 @@
         "신청기간": "2026-04-15 ~ 2026-05-11",
         "링크": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=1&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120834",
         "수집일": "2026-04-16"
+    },
+    {
+        "기관": "기업마당",
+        "매칭 키워드": "-",
+        "사업명": "2026년 IP 라이선싱 빌드업 참가기업(중소IP사) 모집 공고",
+        "공고일": "2026-04-14",
+        "신청기간": "2026-04-06 ~ 2026-04-23",
+        "링크": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?hashCode=&rowsSel=&rows=15&cpage=5&cat=&schPblancDiv=&schJrsdCodeTy=&schWntyAt=&schAreaDetailCodes=&schEndAt=N&orderGb=&sort=&preKeywords=&condition=&condition1=&keyword=&pblancId=PBLN_000000000120772",
+        "수집일": "2026-04-16"
+    },
+    {
+        "기관": "IRIS",
+        "매칭 키워드": "-",
+        "사업명": "test",
+        "공고일": "2026-04-14",
+        "신청기간": "2026-04-14 ~ 2026-04-30",
+        "링크": "https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=020938&ancmPrg=ancmIng",
+        "수집일": "2026-04-16"
+    },
+    {
+        "기관": "NTIS",
+        "매칭 키워드": "-",
+        "사업명": "「NST 출연연 패널조사 기획 및 조사·분석 연구」정책연구과제 공고",
+        "공고일": "2026-04-14",
+        "신청기간": "2026-04-14 ~ 2026-04-28",
+        "링크": "https://www.ntis.go.kr/rndgate/eg/un/ra/view.do?roRndUid=1261642&flag=rndList",
+        "수집일": "2026-04-16"
     }
 ]
