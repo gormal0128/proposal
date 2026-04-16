@@ -77,8 +77,11 @@ def get_nipa():
             gongo = normalize_date(row_text)
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
             
+            # [수정] 키워드를 예쁜 분홍색(Pink-Red)으로 직접 하이라이트
+            styled_kws = ", ".join([f"<span style='color: #e83e8c; font-weight: bold;'>{k}</span>" for k in matched_kws]) if matched_kws else "-"
+            
             items.append({
-                "기관": "NIPA", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
+                "기관": "NIPA", "매칭 키워드": styled_kws,
                 "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
             })
     except Exception as e:
@@ -86,7 +89,7 @@ def get_nipa():
     return items
 
 # ---------------------------------------------------------
-# 2. 기업마당 (href 속성 다이렉트 추출)
+# 2. 기업마당
 # ---------------------------------------------------------
 def get_bizinfo():
     print("\n[기업마당] 1~5페이지 스캔 시작...")
@@ -121,8 +124,10 @@ def get_bizinfo():
                     link = url
 
                 matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
+                styled_kws = ", ".join([f"<span style='color: #e83e8c; font-weight: bold;'>{k}</span>" for k in matched_kws]) if matched_kws else "-"
+                
                 items.append({
-                    "기관": "기업마당", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
+                    "기관": "기업마당", "매칭 키워드": styled_kws,
                     "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
                 })
     except Exception as e:
@@ -132,7 +137,7 @@ def get_bizinfo():
     return items
 
 # ---------------------------------------------------------
-# 3. IRIS (수정됨: 상세페이지 접속하여 접수기간 추출)
+# 3. IRIS (수정됨: 정확한 URL 및 접수기간 추출)
 # ---------------------------------------------------------
 def get_iris():
     print("\n[IRIS] 스캔 시작...")
@@ -163,33 +168,34 @@ def get_iris():
                 
             gongo = normalize_date(gongo_match.group(1)) if gongo_match else "확인필요"
             
+            # [수정 1] 아이디 추출 조건 완화 (6자리 등 짧은 ID도 잡을 수 있도록 수정)
             a_tag_str = str(title_tag)
-            id_match = re.search(r"['\"]([A-Za-z0-9_]{10,})['\"]", a_tag_str)
-            link = f"https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituDtlView.do?pblancId={id_match.group(1)}" if id_match else "상세링크 확인필요"
+            id_match = re.search(r"['\"]([A-Za-z0-9_]{5,15})['\"]", a_tag_str)
             
-            # ---------------------------------------------------------
-            # [추가된 핵심 로직] 조립된 상세 링크로 접속하여 '접수기간' 뜯어오기
-            # ---------------------------------------------------------
-            sinchung = "상세 확인"
+            # [수정 2] 제보해주신 정확한 IRIS 상세페이지 URL 적용
+            link = f"https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId={id_match.group(1)}&ancmPrg=ancmIng" if id_match else "상세링크 확인필요"
+            
+            # [수정 3] 접수기간 추출을 위해 다이렉트 링크로 몰래 한 번 더 접속
+            sinchung = "상세 접속 필요"
             if id_match:
                 try:
                     det_res = requests.get(link, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
                     det_soup = BeautifulSoup(det_res.text, 'html.parser')
                     det_text = det_soup.get_text(separator=' ')
                     
-                    # 상세페이지에 있는 "접수기간 2026-04-14 ~ 2026-05-14" 패턴 추출
+                    # 상세페이지 내 "접수기간 2026-04-14 ~ 2026-05-14" 패턴 추출
                     period_match = re.search(r'접수기간\s*[:|]?\s*([0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2}.*?(?:~|-).*?[0-9]{4}[-.\/][0-9]{2}[-.\/][0-9]{2})', det_text)
                     if period_match:
                         sinchung = period_match.group(1).strip()
                 except:
-                    sinchung = "상세페이지 로드 에러"
-            # ---------------------------------------------------------
+                    sinchung = "상세 접속 필요"
                 
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
+            styled_kws = ", ".join([f"<span style='color: #e83e8c; font-weight: bold;'>{k}</span>" for k in matched_kws]) if matched_kws else "-"
             
             if title not in [item['사업명'] for item in items]:
                 items.append({
-                    "기관": "IRIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
+                    "기관": "IRIS", "매칭 키워드": styled_kws,
                     "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
                 })
     except Exception as e:
@@ -199,7 +205,7 @@ def get_iris():
     return items
 
 # ---------------------------------------------------------
-# 4. NTIS (href 속성 다이렉트 추출)
+# 4. NTIS
 # ---------------------------------------------------------
 def get_ntis():
     print("\n[NTIS] 스캔 시작...")
@@ -237,8 +243,10 @@ def get_ntis():
                 link = "https://www.ntis.go.kr/rndgate/eg/un/ra/mng.do"
             
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
+            styled_kws = ", ".join([f"<span style='color: #e83e8c; font-weight: bold;'>{k}</span>" for k in matched_kws]) if matched_kws else "-"
+            
             items.append({
-                "기관": "NTIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
+                "기관": "NTIS", "매칭 키워드": styled_kws,
                 "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
             })
     except Exception as e:
@@ -261,7 +269,6 @@ def main():
     yesterday_str = (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     day_before_str = (today - datetime.timedelta(days=2)).strftime("%Y-%m-%d")
     
-    # 최근 3일 치 공고 메일 발송 대상으로 수집
     target_dates = [today_str, yesterday_str, day_before_str]
 
     # =========================================================
@@ -277,10 +284,9 @@ def main():
     history_titles = [d.get('사업명', '') for d in history_data]
     for item in all_data:
         if item['사업명'] not in history_titles:
-            item['수집일'] = today_str # 수집된 날짜 도장 쾅!
+            item['수집일'] = today_str
             history_data.append(item)
 
-    # 7일 치 히스토리만 엑셀로 저장
     seven_days_ago_str = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
     valid_history = [item for item in history_data if item.get('수집일', '9999-99-99') >= seven_days_ago_str]
 
@@ -288,7 +294,9 @@ def main():
     if valid_history:
         df_history = pd.DataFrame(valid_history)
         df_history = df_history[['수집일', '기관', '매칭 키워드', '사업명', '공고일', '신청기간', '링크']]
-        df_history['링크'] = df_history['링크'].str.extract(r"href='(.*?)'") # HTML 태그 제거
+        # 엑셀에는 HTML 태그가 그대로 들어가면 지저분하므로 제거해줍니다.
+        df_history['매칭 키워드'] = df_history['매칭 키워드'].str.replace(r"<[^>]*>", "", regex=True)
+        df_history['링크'] = df_history['링크'].str.extract(r"href='(.*?)'") 
         df_history = df_history.sort_values(by=['수집일', '기관'], ascending=[False, True])
         df_history.to_excel(excel_filename, index=False)
 
@@ -314,7 +322,6 @@ def main():
     df_daily = df_daily.sort_values(by=['is_empty', 'has_keyword', '공고일', '기관'], ascending=[True, True, False, True])
     df_daily = df_daily.drop(columns=['is_empty', 'has_keyword'])
 
-    # TEST_MODE 분기
     if TEST_MODE:
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_colwidth', None)
@@ -323,7 +330,6 @@ def main():
         print("✅ 터미널 테스트 완료 (이메일 발송 생략)")
         return
 
-    # 실무용 이메일 발송 처리
     html_table = df_daily.copy()
     html_table['링크'] = html_table['링크'].apply(lambda x: f"<a href='{x}' style='color: #0066cc; font-weight: bold;'>[바로가기]</a>" if x != '-' else '-')
     
@@ -331,9 +337,6 @@ def main():
     html_table_str = html_table_str.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-family: Arial; font-size: 13px; text-align: left; border: 1px solid #ddd;">')
     html_table_str = html_table_str.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px; border: 1px solid #ccc; text-align: center; font-weight: bold; color:#1a73e8; white-space: nowrap;">')
     html_table_str = html_table_str.replace('<td>', '<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle;">')
-
-    for keyword in TARGET_KEYWORDS:
-        html_table_str = html_table_str.replace(f'<td>{keyword}</td>', f'<td style="padding: 10px; border: 1px solid #ddd; vertical-align: middle; color: #d93025; font-weight: bold;">{keyword}</td>')
 
     html_body = f"""
     <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px;">
@@ -344,7 +347,7 @@ def main():
             <strong>🎯 대상 기관:</strong> {', '.join(TARGET_AGENCIES)}<br>
             <strong>🎯 하이라이트 키워드:</strong> {", ".join(TARGET_KEYWORDS)}<br><br>
             <span style="color: #1a73e8; font-weight: bold;">* 본문에는 분야에 상관없이 최근 3일간 등록된 모든 공고가 나열됩니다.</span><br>
-            <span style="color: #e53935; font-weight: bold;">* 타겟 키워드가 매칭된 공고는 표의 최상단에 붉은색으로 우선 배치됩니다.</span><br>
+            <span style="color: #e83e8c; font-weight: bold;">* 타겟 키워드가 매칭된 공고는 표의 최상단에 우선 배치됩니다.</span><br>
             <span style="color: #555; font-weight: bold;">* 1주일간의 누적 데이터는 하단 첨부파일(엑셀)을 확인해 주세요.</span>
         </div>
         {html_table_str}
@@ -358,7 +361,6 @@ def main():
     msg['To'] = ", ".join(receiver_list) 
     msg.attach(MIMEText(html_body, 'html'))
     
-    # 엑셀 파일 메일에 첨부
     if os.path.exists(excel_filename):
         with open(excel_filename, 'rb') as f:
             part = MIMEApplication(f.read(), Name=os.path.basename(excel_filename))
@@ -371,7 +373,6 @@ def main():
         
     print("\n✅ 성공! 엑셀 파일이 첨부된 이메일 발송 완료!")
 
-    # 데이터 누적 저장
     with open(db_file, 'w', encoding='utf-8') as f:
         json.dump(valid_history, f, ensure_ascii=False, indent=4)
         print("✅ 성공! history.json 파일 업데이트 완료!")
