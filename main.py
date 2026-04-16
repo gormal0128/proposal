@@ -132,7 +132,7 @@ def get_bizinfo():
     return items
 
 # ---------------------------------------------------------
-# 3. IRIS 
+# 3. IRIS (수정됨: 확실한 DOM 타겟팅 적용)
 # ---------------------------------------------------------
 def get_iris():
     print("\n[IRIS] 스캔 시작...")
@@ -141,11 +141,15 @@ def get_iris():
     try:
         driver = get_chrome_driver()
         driver.get("https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do")
-        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".list_area li, tbody tr")))
+        
+        # [수정] 무작정 기다리는 대신, '공고일자'라는 텍스트가 화면에 그려질 때까지 대기
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '공고일자')]")))
         time.sleep(3) 
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-        rows = soup.select('.list_area li, tbody tr')
+        
+        # [수정] 클래스명(list_area)에 의존하지 않고, '공고일자' 글씨를 포함하는 li, tr 덩어리를 싹 다 긁어옴
+        rows = soup.find_all(lambda tag: tag.name in ['li', 'tr'] and '공고일자' in tag.text)
         
         for row in rows:
             title_tag = row.select_one('a, .tit')
@@ -154,6 +158,7 @@ def get_iris():
             title = title_tag.text.strip()
             if "안내" in title or "결과" in title: continue
             
+            # 공고일 추출 (기존 작성자님 로직 그대로)
             ancmDe_span = row.find(class_='ancmDe')
             if ancmDe_span:
                 gongo_match = re.search(r'(202[0-9][-.\/][0-1][0-9][-.\/][0-3][0-9])', ancmDe_span.text)
@@ -162,15 +167,19 @@ def get_iris():
                 
             gongo = normalize_date(gongo_match.group(1)) if gongo_match else "확인필요"
             
+            # 상세 링크 추출 (기존 작성자님 로직 그대로)
             a_tag_str = str(title_tag)
             id_match = re.search(r"['\"]([A-Za-z0-9_]{10,})['\"]", a_tag_str)
             link = f"https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituDtlView.do?pblancId={id_match.group(1)}" if id_match else "상세링크 확인필요"
                 
             matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in title.upper()]
-            items.append({
-                "기관": "IRIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
-                "사업명": title, "공고일": gongo, "신청기간": "상세 접속 필요", "링크": link
-            })
+            
+            # 중복 수집 방지 (li 태그가 중첩된 경우 대비)
+            if title not in [item['사업명'] for item in items]:
+                items.append({
+                    "기관": "IRIS", "매칭 키워드": ", ".join(matched_kws) if matched_kws else "-",
+                    "사업명": title, "공고일": gongo, "신청기간": "상세 접속 필요", "링크": link
+                })
     except Exception as e:
         print(f"[IRIS] 에러: {e}")
     finally:
