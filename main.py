@@ -25,7 +25,7 @@ from selenium.webdriver.chrome.service import Service
 TEST_MODE = False # 실무 발송 모드 (이메일 발송)
 
 TARGET_AGENCIES = ["NIPA", "기업마당", "IRIS", "NTIS"]
-TARGET_KEYWORDS = ['AI', 'AX', 'ICT', '실증', '시범', '테스트베드', '데이터', '스마트공장', '디지털전환', '수출', '스마트시티']
+TARGET_KEYWORDS = ['AI', 'AX', 'ICT', '실증', '시범', '테스트베드', '데이터', '스마트공장', '디지털전환', '수출', '스마트시티', 'UAM']
 
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
