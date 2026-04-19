@@ -86,25 +86,24 @@ def get_nipa():
     return items
 
 # ---------------------------------------------------------
-# 2. 기업마당 (OPEN API 기반으로 전면 교체)
+# 2. 기업마당 (자체 API/RSS 기반으로 전면 교체 반영)
 # ---------------------------------------------------------
 def get_bizinfo():
-    print("\n[기업마당] OPEN API 스캔 시작...")
+    print("\n[기업마당] API 스캔 시작...")
     items = []
     
-    if not BIZINFO_API_KEY:
-        print("🚨 [기업마당] 에러: BIZINFO_API_KEY가 설정되지 않았습니다. API 연동을 건너뜁니다.")
-        return items
-        
+    # 깃허브 시크릿에서 키를 못 가져올 경우 하드코딩된 키(a7bru5) 사용 (테스트용)
+    api_key = BIZINFO_API_KEY if BIZINFO_API_KEY else "a7bru5"
+    
     try:
-        # 기업마당 지원사업공고 API 엔드포인트
-        url = "https://www.bizinfo.go.kr/openapi/v1/selectSupportProjectList"
+        # 매뉴얼 7페이지 기준 요청 URL [cite: 128]
+        url = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
         
+        # 매뉴얼 6페이지 기준 요청 파라미터 [cite: 118]
         params = {
-            "crtfcKey": BIZINFO_API_KEY,
-            "dataType": "JSON",
-            "pageNo": "1",
-            "numOfRows": "100"  # 최근 100개 공고 수집
+            "crtfcKey": api_key,
+            "dataType": "json",  # 파싱하기 쉽게 JSON 형태로 요청 [cite: 118]
+            "searchCnt": "100"   # 최근 100개 데이터 제공 [cite: 118]
         }
         
         # API 호출
@@ -113,35 +112,28 @@ def get_bizinfo():
         
         data = res.json()
         
-        # 기업마당/공공데이터포털 JSON 구조에 따른 데이터 추출
-        json_items = []
-        if 'jsonArray' in data:
-            json_items = data['jsonArray']
-        elif 'response' in data and 'body' in data['response']:
-            json_items = data['response']['body'].get('items', [])
-        elif 'items' in data:
-            json_items = data['items']
-
+        # 매뉴얼 14페이지 기준 응답 메시지 구조 (jsonArray 배열 안에 공고 객체들 존재) [cite: 279]
+        json_items = data.get('jsonArray', [])
+        
         for item in json_items:
-            # 사업명 추출
-            title = item.get('pblancNm', '') or item.get('title', '')
+            # 사업명 추출 (pblancNm) [cite: 282]
+            title = item.get('pblancNm', '')
             if not title: continue
             
-            # 공고일 추출
-            reg_date = item.get('creatDt', '') or item.get('pblancStdt', '')
+            # 등록일자 추출 (creatPnttm) [cite: 284]
+            reg_date = item.get('creatPnttm', '')
             gongo = normalize_date(reg_date) if reg_date else "확인필요"
             
-            # 신청기간 추출
-            begin_dt = item.get('reqstBeginDt', '')
-            end_dt = item.get('reqstEndDt', '')
+            # 신청기간 추출 (reqstBeginEndDe) [cite: 281]
+            sinchung = item.get('reqstBeginEndDe', '상세 확인필요')
             
-            if begin_dt and end_dt:
-                sinchung = f"{normalize_date(begin_dt)} ~ {normalize_date(end_dt)}"
+            # 공고 상세 링크 (pblancUrl) [cite: 279]
+            # 상대경로(/web/...)로 오는 경우가 있으므로 도메인을 붙여줌
+            link_suffix = item.get('pblancUrl', '')
+            if link_suffix.startswith('/'):
+                link = "https://www.bizinfo.go.kr" + link_suffix
             else:
-                sinchung = "상세 확인필요"
-                
-            # 공고 상세 링크
-            link = item.get('pblancUrl', "https://www.bizinfo.go.kr")
+                link = link_suffix if link_suffix else "https://www.bizinfo.go.kr"
             
             items.append({
                 "기관": "기업마당",
@@ -152,7 +144,7 @@ def get_bizinfo():
         print(f"[기업마당] API 연동 에러: {e}")
         
     return items
-
+    
 # ---------------------------------------------------------
 # 3. IRIS
 # ---------------------------------------------------------
