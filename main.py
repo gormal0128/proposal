@@ -302,10 +302,27 @@ def main():
     def get_table_html(df):
         if df.empty:
             return "<div style='padding: 20px; text-align: center; color: #777; border: 1px solid #ddd; background-color: #fff;'>해당 조건의 공고가 없습니다.</div>"
+        
         html = df.to_html(index=False, escape=False)
-        html = html.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; background-color: #fff;">')
-        html = html.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px 8px; border: 1px solid #ddd; text-align: center; color:#1a73e8; font-weight: bold;">')
-        html = html.replace('<td>', '<td style="padding: 10px 8px; border: 1px solid #ddd; text-align: center; word-wrap: break-word; vertical-align: middle;">')
+        
+        # 💡 테이블 컬럼별 너비(%) 명시적 지정
+        table_style = """<table style="width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; background-color: #fff;">
+        <colgroup>
+            <col style="width: 10%;">  <col style="width: 12%;">  <col style="width: 48%;">  <col style="width: 10%;">  <col style="width: 14%;">  <col style="width: 6%;">   </colgroup>"""
+        
+        html = html.replace('<table border="1" class="dataframe">', table_style)
+        
+        # 헤더 스타일 (white-space: nowrap 추가하여 제목 줄바꿈 방지)
+        html = html.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px 4px; border: 1px solid #ddd; text-align: center; color:#1a73e8; font-weight: bold; white-space: nowrap;">')
+        
+        # 데이터 셀 기본 스타일 (모두 가운데 정렬)
+        html = html.replace('<td>', '<td style="padding: 10px 6px; border: 1px solid #ddd; text-align: center; word-wrap: break-word; vertical-align: middle;">')
+        
+        # 💡 가독성을 위해 '사업명' 데이터만 왼쪽 정렬로 변경
+        import re
+        html = re.sub(r'(<tr[^>]*>\s*<td[^>]*>.*?</td>\s*<td[^>]*>.*?</td>\s*)<td([^>]*) style="([^"]*)text-align:\s*center([^"]*)"', 
+                      r'\1<td\2 style="\3text-align: left; padding-left: 15px;\4"', html)
+        
         return html
 
     html_table_main = get_table_html(df_main)
