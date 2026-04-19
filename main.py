@@ -86,49 +86,38 @@ def get_nipa():
     return items
 
 # ---------------------------------------------------------
-# 2. 기업마당 (자체 API/RSS 기반으로 전면 교체 반영)
+# 2. 기업마당 (자체 API/RSS 기반으로 전면 교체)
 # ---------------------------------------------------------
 def get_bizinfo():
     print("\n[기업마당] API 스캔 시작...")
     items = []
     
-    # 깃허브 시크릿에서 키를 못 가져올 경우 하드코딩된 키(a7bru5) 사용 (테스트용)
+    # 깃허브 시크릿에서 키를 못 가져올 경우 하드코딩된 키(a7bru5) 사용
     api_key = BIZINFO_API_KEY if BIZINFO_API_KEY else "a7bru5"
     
     try:
-        # 매뉴얼 7페이지 기준 요청 URL [cite: 128]
         url = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
-        
-        # 매뉴얼 6페이지 기준 요청 파라미터 [cite: 118]
         params = {
             "crtfcKey": api_key,
-            "dataType": "json",  # 파싱하기 쉽게 JSON 형태로 요청 [cite: 118]
-            "searchCnt": "100"   # 최근 100개 데이터 제공 [cite: 118]
+            "dataType": "json",
+            "searchCnt": "100"
         }
         
-        # API 호출
         res = requests.get(url, params=params, timeout=15)
         res.raise_for_status()
         
         data = res.json()
-        
-        # 매뉴얼 14페이지 기준 응답 메시지 구조 (jsonArray 배열 안에 공고 객체들 존재) [cite: 279]
         json_items = data.get('jsonArray', [])
         
         for item in json_items:
-            # 사업명 추출 (pblancNm) [cite: 282]
             title = item.get('pblancNm', '')
             if not title: continue
             
-            # 등록일자 추출 (creatPnttm) [cite: 284]
             reg_date = item.get('creatPnttm', '')
             gongo = normalize_date(reg_date) if reg_date else "확인필요"
             
-            # 신청기간 추출 (reqstBeginEndDe) [cite: 281]
             sinchung = item.get('reqstBeginEndDe', '상세 확인필요')
             
-            # 공고 상세 링크 (pblancUrl) [cite: 279]
-            # 상대경로(/web/...)로 오는 경우가 있으므로 도메인을 붙여줌
             link_suffix = item.get('pblancUrl', '')
             if link_suffix.startswith('/'):
                 link = "https://www.bizinfo.go.kr" + link_suffix
@@ -144,7 +133,7 @@ def get_bizinfo():
         print(f"[기업마당] API 연동 에러: {e}")
         
     return items
-    
+
 # ---------------------------------------------------------
 # 3. IRIS
 # ---------------------------------------------------------
@@ -252,10 +241,10 @@ def main():
 
     today = datetime.date.today()
     today_str = today.strftime("%Y-%m-%d")
-    yesterday_str = (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-    day_before_str = (today - datetime.timedelta(days=2)).strftime("%Y-%m-%d")
     
-    target_dates = [today_str, yesterday_str, day_before_str]
+    # 💡 최근 3일, 5일 날짜 리스트 각각 생성
+    target_dates_3 = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(3)]
+    target_dates_5 = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5)]
 
     db_file = 'history.json'
     if os.path.exists(db_file):
@@ -270,14 +259,24 @@ def main():
             item['수집일'] = today_str
             history_data.append(item)
 
+    # 히스토리는 넉넉하게 7일 전 데이터까지 유지
     seven_days_ago_str = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
     valid_history = [item for item in history_data if item.get('수집일', '9999-99-99') >= seven_days_ago_str]
 
-    email_items = [item for item in all_data if item['공고일'] in target_dates]
+    # 💡 기관별 날짜 필터링 적용 (NIPA, IRIS, NTIS는 5일 / 기업마당은 3일)
+    email_items = []
+    for item in all_data:
+        if item['기관'] in ['NIPA', 'IRIS', 'NTIS']:
+            if item['공고일'] in target_dates_5:
+                email_items.append(item)
+        else: # 기업마당
+            if item['공고일'] in target_dates_3:
+                email_items.append(item)
+
     df_daily = pd.DataFrame(email_items)
     
     if df_daily.empty:
-        df_daily = pd.DataFrame([{"기관": "-", "매칭 키워드": "-", "사업명": "최근 3일간 신규 공고가 없습니다.", "공고일": "-", "신청기간": "-", "링크": "-"}])
+        df_daily = pd.DataFrame([{"기관": "-", "매칭 키워드": "-", "사업명": "해당 조건에 맞는 신규 공고가 없습니다.", "공고일": "-", "신청기간": "-", "링크": "-"}])
     
     df_daily = df_daily[['기관', '매칭 키워드', '사업명', '공고일', '신청기간', '링크']]
     df_daily['분류'] = df_daily['사업명'].apply(categorize_region)
@@ -308,18 +307,19 @@ def main():
         # 💡 테이블 컬럼별 너비(%) 명시적 지정
         table_style = """<table style="width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; background-color: #fff;">
         <colgroup>
-            <col style="width: 10%;">  <col style="width: 12%;">  <col style="width: 48%;">  <col style="width: 10%;">  <col style="width: 14%;">  <col style="width: 6%;">   </colgroup>"""
+            <col style="width: 10%;">
+            <col style="width: 12%;">
+            <col style="width: 48%;">
+            <col style="width: 10%;">
+            <col style="width: 14%;">
+            <col style="width: 6%;">
+        </colgroup>"""
         
         html = html.replace('<table border="1" class="dataframe">', table_style)
-        
-        # 헤더 스타일 (white-space: nowrap 추가하여 제목 줄바꿈 방지)
         html = html.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px 4px; border: 1px solid #ddd; text-align: center; color:#1a73e8; font-weight: bold; white-space: nowrap;">')
-        
-        # 데이터 셀 기본 스타일 (모두 가운데 정렬)
         html = html.replace('<td>', '<td style="padding: 10px 6px; border: 1px solid #ddd; text-align: center; word-wrap: break-word; vertical-align: middle;">')
         
-        # 💡 가독성을 위해 '사업명' 데이터만 왼쪽 정렬로 변경
-        import re
+        # 가독성을 위해 '사업명' 데이터만 왼쪽 정렬로 변경
         html = re.sub(r'(<tr[^>]*>\s*<td[^>]*>.*?</td>\s*<td[^>]*>.*?</td>\s*)<td([^>]*) style="([^"]*)text-align:\s*center([^"]*)"', 
                       r'\1<td\2 style="\3text-align: left; padding-left: 15px;\4"', html)
         
@@ -336,7 +336,7 @@ def main():
         <div style="background-color: #f3f6fc; padding: 15px; border-radius: 5px; margin-bottom: 20px; font-size: 13px; color: #333; line-height: 1.6; border-left: 4px solid #1a73e8;">
             <strong>🎯 대상 기관:</strong> {', '.join(TARGET_AGENCIES)}<br>
             <strong>🎯 하이라이트 키워드:</strong> {", ".join(TARGET_KEYWORDS)}<br><br>
-            <span style="color: #1a73e8; font-weight: bold;">* 분야에 상관없이 최근 3일간 등록된 신규 공고입니다.</span><br>
+            <span style="color: #1a73e8; font-weight: bold;">* 기업마당은 최근 3일, 그 외 기관(NIPA, IRIS, NTIS)은 최근 5일간 등록된 신규 공고입니다.</span><br>
             <span style="color: #e83e8c; font-weight: bold;">* 타겟 키워드가 매칭된 공고는 표 최상단에 우선 배치됩니다.</span>
         </div>
         
