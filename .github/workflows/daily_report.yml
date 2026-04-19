@@ -35,6 +35,7 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+          BIZINFO_API_KEY: ${{ secrets.BIZINFO_API_KEY }} 
         run: python main.py
 
       - name: 변경된 데이터를 저장합니다
