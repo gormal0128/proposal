@@ -23,17 +23,16 @@ from selenium.webdriver.chrome.service import Service
 # =========================================================
 # ⚙️ 설정
 # =========================================================
-TEST_MODE = False  # False로 변경됨 (이메일 실제 발송)
+TEST_MODE = False  # False: 이메일 실제 발송
 
 TARGET_AGENCIES = ["NIPA", "기업마당", "IRIS", "NTIS"]
 TARGET_KEYWORDS = ['AI', 'AX', 'ICT', '실증', '시범', '테스트베드', '데이터', '스마트공장', '디지털전환', '수출', '스마트시티', 'UAM']
 
-# 깃허브 액션 Secrets에서 가져옴
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
+BIZINFO_API_KEY = os.getenv("BIZINFO_API_KEY") # 추가된 기업마당 API KEY
 
-# 탭 분류를 위한 지방 키워드 (서울 제외)
 LOCAL_REGIONS = ['강원', '경기', '경남', '경북', '광주', '대구', '대전', '부산', '세종', '울산', '인천', '전남', '전북', '제주', '충남', '충북']
 
 def get_chrome_driver():
@@ -63,7 +62,6 @@ def get_nipa():
     try:
         res = requests.get("https://www.nipa.kr/home/2-2", headers=headers, timeout=15)
         soup = BeautifulSoup(res.text, 'html.parser')
-        
         for row in soup.select('tbody tr'):
             a_tag = row.select_one('a')
             if not a_tag: continue
@@ -88,48 +86,71 @@ def get_nipa():
     return items
 
 # ---------------------------------------------------------
-# 2. 기업마당
+# 2. 기업마당 (OPEN API 기반으로 전면 교체)
 # ---------------------------------------------------------
 def get_bizinfo():
-    print("\n[기업마당] 1~5페이지 스캔 시작...")
+    print("\n[기업마당] OPEN API 스캔 시작...")
     items = []
-    driver = None
+    
+    if not BIZINFO_API_KEY:
+        print("🚨 [기업마당] 에러: BIZINFO_API_KEY가 설정되지 않았습니다. API 연동을 건너뜁니다.")
+        return items
+        
     try:
-        driver = get_chrome_driver()
-        for page in range(1, 6):
-            url = f"https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do?rows=15&cpage={page}"
-            driver.get(url)
-            try: WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "tbody tr")))
-            except: break
-                
-            time.sleep(1)
-            soup = BeautifulSoup(driver.page_source, 'html.parser')
-            
-            for row in soup.select('tbody tr'):
-                tds = row.find_all('td')
-                if len(tds) < 7: continue 
-                
-                title_tag = tds[2].find('a')
-                if not title_tag: continue
-                
-                title = title_tag.text.strip()
-                sinchung = tds[3].text.strip()
-                gongo = normalize_date(tds[6].text.strip())
-                
-                href = title_tag.get('href', '')
-                if href and not href.startswith('javascript'):
-                    link = "https://www.bizinfo.go.kr" + href if href.startswith('/') else href
-                else:
-                    link = url
+        # 기업마당 지원사업공고 API 엔드포인트
+        url = "https://www.bizinfo.go.kr/openapi/v1/selectSupportProjectList"
+        
+        params = {
+            "crtfcKey": BIZINFO_API_KEY,
+            "dataType": "JSON",
+            "pageNo": "1",
+            "numOfRows": "100"  # 최근 100개 공고 수집
+        }
+        
+        # API 호출
+        res = requests.get(url, params=params, timeout=15)
+        res.raise_for_status()
+        
+        data = res.json()
+        
+        # 기업마당/공공데이터포털 JSON 구조에 따른 데이터 추출
+        json_items = []
+        if 'jsonArray' in data:
+            json_items = data['jsonArray']
+        elif 'response' in data and 'body' in data['response']:
+            json_items = data['response']['body'].get('items', [])
+        elif 'items' in data:
+            json_items = data['items']
 
-                items.append({
-                    "기관": "기업마당",
-                    "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
-                })
+        for item in json_items:
+            # 사업명 추출
+            title = item.get('pblancNm', '') or item.get('title', '')
+            if not title: continue
+            
+            # 공고일 추출
+            reg_date = item.get('creatDt', '') or item.get('pblancStdt', '')
+            gongo = normalize_date(reg_date) if reg_date else "확인필요"
+            
+            # 신청기간 추출
+            begin_dt = item.get('reqstBeginDt', '')
+            end_dt = item.get('reqstEndDt', '')
+            
+            if begin_dt and end_dt:
+                sinchung = f"{normalize_date(begin_dt)} ~ {normalize_date(end_dt)}"
+            else:
+                sinchung = "상세 확인필요"
+                
+            # 공고 상세 링크
+            link = item.get('pblancUrl', "https://www.bizinfo.go.kr")
+            
+            items.append({
+                "기관": "기업마당",
+                "사업명": title, "공고일": gongo, "신청기간": sinchung, "링크": link
+            })
+            
     except Exception as e:
-        print(f"[기업마당] 에러: {e}")
-    finally:
-        if driver: driver.quit()
+        print(f"[기업마당] API 연동 에러: {e}")
+        
     return items
 
 # ---------------------------------------------------------
@@ -142,13 +163,11 @@ def get_iris():
     try:
         driver = get_chrome_driver()
         driver.get("https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do")
-        
         WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '공고일자')]")))
         time.sleep(3) 
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         rows = soup.find_all(lambda tag: tag.name in ['li', 'tr'] and '공고일자' in tag.text)
-        
         for row in rows:
             title_tag = row.select_one('a, .tit')
             if not title_tag: continue
@@ -169,7 +188,6 @@ def get_iris():
             link = f"https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId={id_match.group(1)}&ancmPrg=ancmIng" if id_match else "상세링크 확인필요"
             
             sinchung = "상세 접속 필요"
-            
             if title not in [item['사업명'] for item in items]:
                 items.append({
                     "기관": "IRIS", 
@@ -191,7 +209,6 @@ def get_ntis_rss():
         url = "http://www.ntis.go.kr/rndgate/unRndRss.xml?prt=100"
         res = requests.get(url, timeout=10)
         res.encoding = 'utf-8'
-        
         root = ET.fromstring(res.text)
         
         for item in root.findall('.//item'):
@@ -202,7 +219,6 @@ def get_ntis_rss():
             appdue = item.findtext('appdue', '')
             
             gongo = normalize_date(pubDate)
-            
             if appbegin and appdue:
                 sinchung = f"{normalize_date(appbegin)} ~ {normalize_date(appdue)}"
             else:
@@ -217,7 +233,7 @@ def get_ntis_rss():
     return items
 
 # ---------------------------------------------------------
-# 지역 분류 함수 (서울/전국 vs 그외 지방)
+# 지역 분류 함수
 # ---------------------------------------------------------
 def categorize_region(title):
     match = re.search(r'\[(.*?)\]', title)
@@ -237,7 +253,6 @@ def main():
     all_data.extend(get_iris()) 
     all_data.extend(get_ntis_rss())
 
-    # 키워드 매칭 로직 공통 적용
     for item in all_data:
         matched_kws = [k for k in TARGET_KEYWORDS if k.upper() in item['사업명'].upper()]
         styled_kws = ", ".join([f"<span style='color: #e83e8c; font-weight: bold;'>{k}</span>" for k in matched_kws]) if matched_kws else "-"
@@ -250,7 +265,6 @@ def main():
     
     target_dates = [today_str, yesterday_str, day_before_str]
 
-    # 히스토리 누적 로직
     db_file = 'history.json'
     if os.path.exists(db_file):
         with open(db_file, 'r', encoding='utf-8') as f:
@@ -267,9 +281,7 @@ def main():
     seven_days_ago_str = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
     valid_history = [item for item in history_data if item.get('수집일', '9999-99-99') >= seven_days_ago_str]
 
-    # 이메일/리포트 본문 생성 로직
     email_items = [item for item in all_data if item['공고일'] in target_dates]
-
     df_daily = pd.DataFrame(email_items)
     
     if df_daily.empty:
@@ -301,14 +313,12 @@ def main():
         html = df.to_html(index=False, escape=False)
         html = html.replace('<table border="1" class="dataframe">', '<table style="width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; background-color: #fff;">')
         html = html.replace('<th>', '<th style="background-color: #f3f6fc; padding: 12px 8px; border: 1px solid #ddd; text-align: center; color:#1a73e8; font-weight: bold;">')
-        # 열 너비 강제 지정을 위해 tr/td 정규식 대신 심플하게 치환
         html = html.replace('<td>', '<td style="padding: 10px 8px; border: 1px solid #ddd; text-align: center; word-wrap: break-word; vertical-align: middle;">')
         return html
 
     html_table_main = get_table_html(df_main)
     html_table_local = get_table_html(df_local)
 
-    # 이메일용 HTML 구조 (자바스크립트 탭 제거, 위아래 스크롤 형태)
     html_body = f"""
     <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
         <h2 style="color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px;">
@@ -355,7 +365,6 @@ def main():
         except Exception as e:
             print(f"\n❌ 이메일 발송 실패: {e}")
 
-    # 히스토리 업데이트
     with open(db_file, 'w', encoding='utf-8') as f:
         json.dump(valid_history, f, ensure_ascii=False, indent=4)
         print("✅ 성공! history.json 파일 업데이트 완료!")
