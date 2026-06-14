@@ -225,6 +225,33 @@ def categorize_region(title):
                 return '지방'
     return '전국/서울'
 
+# ---------------------------------------------------------
+# index.html 생성 함수
+# ---------------------------------------------------------
+def save_index_html(html_body):
+    # GitHub Actions는 UTC 기준이라 KST(+9시간)로 변환
+    now_kst = datetime.datetime.utcnow() + datetime.timedelta(hours=9)
+    update_time = now_kst.strftime("%Y-%m-%d %H:%M")
+
+    full_html = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>통합 사업 공고 일일 리포트</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f9f9f9;">
+{html_body}
+    <div style="max-width:1200px; margin:0 auto; padding:10px 20px 30px; text-align:right; color:#999; font-size:12px;">
+        마지막 업데이트: {update_time} (KST)
+    </div>
+</body>
+</html>"""
+
+    with open('index.html', 'w', encoding='utf-8') as f:
+        f.write(full_html)
+    print("✅ 성공! index.html 파일 생성 완료!")
+
 def main():
     print(f"\n🚀 통합 크롤링 시작 (TEST_MODE: {TEST_MODE})\n")
     
@@ -351,7 +378,8 @@ def main():
         {html_table_local}
     </div>
     """
-
+    save_index_html(html_body)
+    
     if TEST_MODE:
         print(df_daily)
         print("\n✅ TEST_MODE 켜짐: 이메일 발송을 생략합니다.")
