@@ -246,11 +246,6 @@ def save_index_html(html_body):
         마지막 업데이트: {update_time} (KST)
      </div>
 
-    <!-- 카카오 애드핏 광고 -->
-    <div style="text-align:center; padding:20px 0 40px;">
-        <ins class="kakao_ad_area" style="display:none;" data-ad-unit="DAN-CaZ0mlDDfjW064G7" data-ad-width="728" data-ad-height="90"></ins>
-        <script type="text/javascript" src="//t1.kakaocdn.net/kas/static/ba.min.js" async></script>
-    </div>
 </body>
 </html>"""
 
