@@ -5,9 +5,12 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write            # git push 권한 명시 (기본 권한이 read일 때 대비)
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04    # [변경] latest → 고정
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -17,17 +20,15 @@ jobs:
       - name: 파이썬을 설치합니다
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.12'   # [변경] 3.9 → 3.12
+          cache: 'pip'             # [추가] 설치 시간 단축
 
-      # [추가됨] GitHub 서버에 크롬 브라우저를 설치합니다!
-      - name: Install Chrome
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+      # [변경] 24.04 이미지는 Chrome 기본 탑재 → 설치 단계 삭제, 버전 확인만
+      - name: Chrome 버전 확인
+        run: google-chrome --version
 
       - name: 라이브러리를 설치합니다
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: 파이썬 스크립트를 실행합니다
         env:
@@ -35,13 +36,13 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
-          BIZINFO_API_KEY: ${{ secrets.BIZINFO_API_KEY }} 
+          BIZINFO_API_KEY: ${{ secrets.BIZINFO_API_KEY }}
         run: python main.py
 
       - name: 변경된 데이터를 저장합니다
         run: |
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
-          git add .          # ← index.html 포함해서 전부 스테이징됨
+          git add .
           git commit -m "Update history and excel data" || echo "No changes to commit"
           git push
